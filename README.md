@@ -1,6 +1,6 @@
 # mcp-gradecard
 
-Formerly mcp-audit (renamed for PyPI; the GitHub repo keeps its old name). The old `mcp-audit` command still works as an alias.
+Formerly mcp-audit (renamed for PyPI; the GitHub repository is now calasdan-sketch/mcp-gradecard, and GitHub redirects the old URL). The old `mcp-audit` command still works as an alias.
 
 **An offline, zero-dependency security audit of every MCP server your AI
 agents can use, graded A to F, with a report you can hand to someone.**
@@ -20,7 +20,7 @@ Thousands of one-line-install MCP servers, ~zero vetting. This is the vetting.
 ### Quick start
 
 ```bash
-pip install git+https://github.com/calasdan-sketch/mcp-audit
+pip install git+https://github.com/calasdan-sketch/mcp-gradecard
 mcp-gradecard                                   # terminal report
 mcp-gradecard --format html > mcp-report.html   # a report to read or share
 ```
@@ -71,7 +71,7 @@ and Semgrep rules. mcp-gradecard reads configs and live tool lists only.
 Zero dependencies — Python 3.10+ stdlib only.
 
 ```bash
-pip install git+https://github.com/calasdan-sketch/mcp-audit
+pip install git+https://github.com/calasdan-sketch/mcp-gradecard
 mcp-gradecard                         # auto-discovers installed clients
 ```
 
