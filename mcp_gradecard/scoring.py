@@ -174,17 +174,26 @@ def _sarif_rule(check: str) -> dict:
         rule["help"] = {"text": fix + (f" (OWASP MCP Top 10: {owasp})"
                                        if owasp else "")}
         rule["helpUri"] = catalog.OWASP_URL if refs else (
-            "https://github.com/calasdan-sketch/mcp-audit")
+            "https://github.com/calasdan-sketch/mcp-gradecard")
     return rule
 
 
 def _fingerprint(r: dict, f: dict) -> str:
     """The same finding on the same server gets the same id on every run,
-    so code scanning can tell new alerts from old ones."""
+    so code scanning can tell new alerts from old ones. Numbers in the
+    message are left out: a count ("3 tools changed", "+2 more") moves
+    while the alert is the same one."""
     import hashlib
     import json
-    key = json.dumps([r.get("client"), r.get("path"), r.get("project"),
-                      r.get("name"), f["check"], f["message"]],
+    import os
+    import re
+    try:
+        path = os.path.realpath(str(r.get("path")))
+    except (OSError, ValueError):
+        path = str(r.get("path"))
+    key = json.dumps([r.get("client"), path, r.get("project"),
+                      r.get("name"), f["check"],
+                      re.sub(r"[0-9]+", "#", f["message"])],
                      ensure_ascii=False)
     return hashlib.sha256(key.encode("utf-8", "surrogatepass")).hexdigest()
 
@@ -231,7 +240,7 @@ def render_sarif(results: list[dict], version: str) -> dict:
             "tool": {"driver": {
                 "name": "mcp-gradecard", "version": version,
                 "informationUri":
-                    "https://github.com/calasdan-sketch/mcp-audit",
+                    "https://github.com/calasdan-sketch/mcp-gradecard",
                 "rules": list(rules.values())}},
             "results": out,
         }],

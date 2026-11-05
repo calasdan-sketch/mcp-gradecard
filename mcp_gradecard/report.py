@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import datetime
 import html
+import re
 
 from . import catalog, redact, scoring
 
@@ -344,11 +345,38 @@ def render_html(results: list[dict], warnings: "list[dict] | None" = None,
 _MD_SPECIAL = set("\\`*_{}[]<>|~#!&")
 
 
+_EMAIL_AT = re.compile(r"(?<=[A-Za-z0-9._%+\-])@(?=[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)*"
+                       r"\.[A-Za-z]{2,})")
+
+
+def _defang(text: str) -> str:
+    """Break what a GitHub-flavoured renderer would turn into a link on its
+    own (`https://...`, `www.`, an e-mail address), the way security reports
+    write indicators: https[:]//host, www[.]host, user[@]host."""
+    text = re.sub(r"(?i)\b([a-z][a-z0-9+.\-]{0,20}):(?=//)", r"\1[:]", text)
+    text = re.sub(r"(?i)\bwww\.", "www[.]", text)
+    return _EMAIL_AT.sub("[@]", text)
+
+
+def _mc(text) -> str:
+    """Untrusted text as a Markdown code span: nothing inside one is markup,
+    a link or an auto-link. A `|` is escaped for the table it may sit in, and
+    the fence is longer than any run of backticks in the text."""
+    body = redact.sanitize(str(text)).replace("|", "\\|")
+    if not body:
+        return "` `"
+    run = max((len(m) for m in re.findall(r"`+", body)), default=0)
+    fence = "`" * (run + 1)
+    pad = " " if body.startswith("`") or body.endswith("`") or run else ""
+    return f"{fence}{pad}{body}{pad}{fence}"
+
+
 def _m(text) -> str:
     """Untrusted text, inert in Markdown: every character that could start
-    markup (a link, an image, raw HTML, a table cell) is escaped."""
+    markup (a link, an image, raw HTML, a table cell) is escaped, and what
+    would be auto-linked is defanged."""
     out = []
-    for ch in redact.sanitize(str(text)):
+    for ch in _defang(redact.sanitize(str(text))):
         if ch == "&":
             out.append("&amp;")
         elif ch in _MD_SPECIAL:
@@ -356,6 +384,14 @@ def _m(text) -> str:
         else:
             out.append(ch)
     return "".join(out)
+
+
+def _ours(text: str) -> str:
+    """This project's own remediation text: its `code` stays code, the rest
+    is escaped like anything else."""
+    parts = re.split(r"(`[^`]+`)", text)
+    return "".join(p if p.startswith("`") and p.endswith("`") and len(p) > 1
+                   else _m(p) for p in parts)
 
 
 def render_markdown(results: list[dict],
@@ -385,7 +421,7 @@ def render_markdown(results: list[dict],
              f"{counts['medium']} | {counts['low']} |", ""]
     if warnings:
         lines += ["## Not audited", ""]
-        lines += [f"- {_m(w['path'])} ({_m(w['client'])}): {_m(w['reason'])}"
+        lines += [f"- {_mc(w['path'])} ({_mc(w['client'])}): {_m(w['reason'])}"
                   for w in warnings]
         lines.append("")
     top = _top(results)
@@ -393,7 +429,7 @@ def render_markdown(results: list[dict],
         lines += ["## Fix these first", "",
                   "| Severity | Server | Finding |", "|---|---|---|"]
         for r, f in top:
-            lines.append(f"| {f['severity'].upper()} | {_m(r['name'])} | "
+            lines.append(f"| {f['severity'].upper()} | {_mc(r['name'])} | "
                          f"**{_m(catalog.title(f['check']))}**: "
                          f"{_m(f['message'])} |")
         lines.append("")
@@ -403,16 +439,16 @@ def render_markdown(results: list[dict],
                   "|---|---|---|---|---|"]
         ordered = sorted(results, key=lambda x: (x["score"], x["name"]))
         for r in ordered:
-            lines.append(f"| {r['grade']} | {_m(r['name'])} | "
-                         f"{_m(r['client'])} | {r['score']}/100 | "
+            lines.append(f"| {r['grade']} | {_mc(r['name'])} | "
+                         f"{_mc(r['client'])} | {r['score']}/100 | "
                          f"{len(r['findings'])} |")
         lines.append("")
         lines += ["## Findings by server", ""]
         for r in ordered:
-            lines += [f"### [{r['grade']}] {_m(r['name'])} "
-                      f"({_m(r['client'])}, {r['score']}/100)", "",
-                      f"{_m(r['path'])}"
-                      + (f" (project: {_m(r['project'])})"
+            lines += [f"### [{r['grade']}] {_mc(r['name'])} "
+                      f"({_mc(r['client'])}, {r['score']}/100)", "",
+                      f"{_mc(r['path'])}"
+                      + (f" (project: {_mc(r['project'])})"
                          if "project" in r else ""), ""]
             if not r["findings"]:
                 lines += [_m(scoring._deep_line(r) or "No findings."), ""]
@@ -429,13 +465,13 @@ def render_markdown(results: list[dict],
             remedies = _remedies(r["findings"])
             if remedies:
                 lines += ["What to do:", ""]
-                lines += [f"- **{_m(catalog.title(c))}**: {_m(t)}"
+                lines += [f"- **{_m(catalog.title(c))}**: {_ours(t)}"
                           for c, t in remedies]
                 lines.append("")
     empty = _empty_configs(configs)
     if empty:
         lines += ["## Config files with no servers", ""]
-        lines += [f"- {_m(c['path'])} ({_m(c['client'])})" for c in empty]
+        lines += [f"- {_mc(c['path'])} ({_mc(c['client'])})" for c in empty]
         lines.append("")
     lines += ["## OWASP MCP Top 10", "", "| Risk | Findings |", "|---|---|"]
     for ref, n in _owasp_counts(results).items():

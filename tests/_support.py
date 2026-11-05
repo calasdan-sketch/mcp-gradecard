@@ -140,7 +140,10 @@ def as_read(fmt: str, out: str) -> str:
     the other formats are as printed."""
     if fmt == "markdown":
         import re
-        return re.sub(r"\\(.)", r"\1", out).replace("&amp;", "&")
+        # Markdown escapes only ASCII punctuation; `\x1b` in a code span
+        # is the text itself
+        return re.sub(r"\\([!-/:-@\[-`{-~])", r"\1", out).replace(
+            "&amp;", "&")
     if fmt == "html":
         import html
         return html.unescape(out)

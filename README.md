@@ -36,7 +36,7 @@ A finished report for a small demo config is in
         [CRITICAL] command pipes content into a shell (classic curl|sh pattern)
   [D] vendor-crm  (50/100)  <explicit>
         [HIGH    ] remote MCP server in 'url' is reached over plain http:// (no TLS): ...
-        [HIGH    ] credential written into the server URL in 'url' (api_key): ...
+        [HIGH    ] credential written into a URL in 'url' (api_key): ...
   [B] github  (75/100)  <explicit>
         [MEDIUM  ] unpinned package '@modelcontextprotocol/server-github' — ...
         [LOW     ] credential stored in plain text in the config file: env GITHUB_PERSONAL_ACCESS_TOKEN — ...
@@ -293,9 +293,9 @@ Weekly cron example (uses the installed console script):
 | `invalid-config` | high | The entry is not an object, or `command`/`args`/`env`/`url`/`serverUrl` has the wrong type |
 | `deep-probe` | low | `--deep` only: the server was not launched (it has critical findings, a `detector-error` or `unparseable-url` or a registry over plain http, it comes from a project file in the current directory, it is disabled in its config, or it is remote), could not be probed (did not start, silent, exited early, sent too much output), or only part of its tools were read |
 | `unauditable` | low | The entry has neither `command` nor `url`/`serverUrl` (for instance a Zed server provided by an extension): what it runs is not in the config |
-| `insecure-transport` | high / medium | A remote server (`url`, `serverUrl`, or the URL a bridge such as `mcp-remote` is given) is reached over plain `http://` or `ws://` to a host that is not this machine: anyone on the network path can read the traffic, tokens included, and rewrite the tool descriptions the agent reads. **Medium** when the host is a private LAN address. Loopback is not reported |
-| `credential-in-url` | high | The same URLs carry a literal credential: a `user:password@`, or a query parameter named like one (`token`, `api_key`, `key`, `access_token`, `password`, `sig`, or any name `secret-env` would flag). A reference (`?token=${TOKEN}`) is not flagged. Only the parameter names are printed. The MCP authorization spec says access tokens must not go in the query string |
-| `plaintext-secret` | low / high | An `env` value that is a credential written out (a known token shape such as `ghp_...` or `sk-...`, or a value of 8+ characters under a credential name) rather than a reference. **High** in a project file (`./.mcp.json`, `./.cursor/mcp.json`, ...), which is usually committed. Only names are printed |
+| `insecure-transport` | high / medium | A remote server (`url`, `serverUrl`, or the URL a bridge such as `mcp-remote` is given) is reached over plain `http://` or `ws://` to a host that is not this machine: anyone on the network path can read the traffic, tokens included, and rewrite the tool descriptions the agent reads. **Medium** when the host is a private LAN address or the container host (`host.docker.internal`, `gateway.docker.internal`, `host.containers.internal`). Loopback is not reported |
+| `credential-in-url` | high / medium | A URL carries a credential: a `user:password@` (database URLs such as `postgresql://user:pw@host/db` too), a query parameter named like one (`token`, `api_key`, `key`, `access_token`, `password`, `sig`, or any name `secret-env` would flag), or a secret in the path (an `fc-...` key, a token shape such as `sk-...`, or a long random segment on a host known to put keys there: `zapier.com`, `firecrawl.dev`). Read in the server's own URL, a bridge's URL and every URL in `args` (**high**) and in `env` values (**medium**: a plain-text secret in the file). A reference that still sends the secret in the URL (`?token=${TOKEN}`) is **medium**. Placeholders (`YOUR_API_KEY_HERE`, `<YOUR_TOKEN>`, `xxxx`, `changeme`, `REPLACE_ME`) are skipped. Only parameter names are printed. For OAuth-style access-token parameters the message cites the [MCP authorization spec](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization) (2025-06-18, Token Requirements: access tokens MUST NOT be included in the URI query string); for a static API key it says keeping credentials out of URLs is standard practice |
+| `plaintext-secret` | low / high | An `env` value that is a credential written out (a known token shape such as `ghp_...` or `sk-...`, or a value of 8+ characters under a credential name) rather than a reference, and not a placeholder (`YOUR_API_KEY_HERE`, `<YOUR_TOKEN>`, `xxxx`, `changeme`). **High** in a project file (`./.mcp.json`, `./.cursor/mcp.json`, ...), which is usually committed. Only names are printed |
 | `tool-changed` | high | `--deep --pins` only: a tool's definition (any field, schemas included) or the server's instructions changed since they were pinned - a possible rug pull. Reported on every run until accepted with `--update-pins` |
 | `tool-added` | medium | `--deep --pins` only: a tool (or server instructions) that was not there when the server was pinned |
 | `tool-removed` | low | `--deep --pins` only: a pinned tool is gone (not reported when the probe read only part of the list) |
@@ -717,7 +717,13 @@ server sends (the whole definition as sent, schemas included) and of its
 and says how many tools it pinned; every later run compares and reports
 `tool-changed`, `tool-added` and `tool-removed` until you review the change
 and run once with `--update-pins`. A server seen for the first time is added
-quietly. FILE holds server names, tool names and hashes - never a
+quietly. Servers are keyed by client, the config file's real path (so
+`./x.json`, an absolute path and a symlink are one file), project and name.
+When a server shows up under a new file but has pins under a file that is no
+longer read (a moved or renamed config), it is compared against those pins
+and a note says so: moving a file cannot launder a rug pull. Pins of a server
+that is gone - its file no longer exists, or the file was audited and no
+longer holds it - are dropped, with a note. FILE holds server names, tool names and hashes - never a
 description - and never leaves the machine. A pins file that cannot be read
 or written stops the run with exit 2: a broken file must not switch the
 check off. Servers `--deep` does not launch (held back, disabled, remote)
@@ -943,9 +949,13 @@ What mcp-gradecard does not do, so that you do not find out the hard way:
   found; a server that legitimately documents how it works with another
   (say, a workflow server that names a GitHub tool) is reported and needs a
   person to read it.
-- A credential in a URL is found by its parameter name or a `user:pass@`.
-  A secret in the URL path (some hosted MCP services put one there) is not
-  recognised.
+- A credential in a URL is found by its parameter name, a `user:pass@`, a
+  known shape in the path, or a random-looking path segment on the few hosts
+  listed under `credential-in-url`. A secret in the path of any other host,
+  with no known shape, is not recognised.
+- The Markdown report puts names and paths in code spans and defangs URLs
+  and e-mail addresses in messages (`https[:]//host`, `user[@]host`) so a
+  renderer cannot turn them into links.
 - Remote servers' live tool lists are not fetched, so pins and shadowing
   cover the stdio servers `--deep` launches.
 

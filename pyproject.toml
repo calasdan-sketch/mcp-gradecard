@@ -23,8 +23,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/calasdan-sketch/mcp-audit"
-Issues = "https://github.com/calasdan-sketch/mcp-audit/issues"
+Homepage = "https://github.com/calasdan-sketch/mcp-gradecard"
+Issues = "https://github.com/calasdan-sketch/mcp-gradecard/issues"
 
 [project.scripts]
 mcp-gradecard = "mcp_gradecard.cli:main"

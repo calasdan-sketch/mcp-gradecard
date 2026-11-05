@@ -288,14 +288,34 @@ def _toolset_pass(results: list[dict], pins_path: "str | None",
     first = not os.path.exists(pins_path)
     servers = dict(pinned)
     changed = False
+    live = {toolset.server_key(r) for r in results}
     for r in results:
         if "deep_read" not in r:    # not probed, or the probe failed
             continue
         key = toolset.server_key(r)
         now = toolset.snapshot(r.get("tools") or [], r.get("deep_server"))
         labels[key] = {"name": r["name"], "client": r["client"],
-                       "path": r["path"]}
+                       "path": toolset.real_path(r["path"])}
         if key not in servers:
+            # The same server under another key (a moved or renamed config
+            # file): compare against those pins rather than start afresh,
+            # so moving a file cannot launder a rug pull, and say so.
+            twins = [k for k in pinned if k not in live
+                     and (toolset.key_parts(k) or (None,) * 4)[0] == r["client"]
+                     and (toolset.key_parts(k) or (None,) * 4)[3] == r["name"]]
+            if twins:
+                old = (toolset.key_parts(twins[0]) or ("", "?"))[1]
+                _note(f"--pins: '{r['name']}' <{r['client']}> has pins "
+                      f"recorded for another file ({old}); comparing with "
+                      "those" + (f" ({len(twins)} candidates, the first is "
+                                 "used)" if len(twins) > 1 else ""))
+                found = toolset.compare(pinned[twins[0]], now,
+                                        r.get("deep_complete", True))
+                _add_findings(r, found)
+                if found and not update:
+                    servers[key] = pinned[twins[0]]
+                    changed = True
+                    continue
             servers[key] = now
             changed = True
             continue
@@ -306,6 +326,14 @@ def _toolset_pass(results: list[dict], pins_path: "str | None",
             if update:
                 servers[key] = now
                 changed = True
+    stale = toolset.plan_prune(servers, results)
+    for key in stale:
+        parts = toolset.key_parts(key) or ("?", "?", None, "?")
+        _note(f"--pins: dropped the pins of '{parts[3]}' <{parts[0]}>: it is "
+              f"no longer configured in {parts[1]}")
+        servers.pop(key, None)
+        labels.pop(key, None)
+        changed = True
     if changed or first:
         toolset.save(pins_path, servers, labels)
     count = sum(len(t) for t in servers.values())

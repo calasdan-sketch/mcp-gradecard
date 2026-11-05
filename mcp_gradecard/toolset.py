@@ -57,13 +57,53 @@ def _names(items) -> str:
     return text
 
 
+def real_path(path) -> str:
+    """The file a config path names, whatever spelling it was found by
+    (`./x.json`, a symlink, a different working directory)."""
+    try:
+        return os.path.realpath(str(path))
+    except (OSError, ValueError):
+        return str(path)
+
+
 def server_key(result: dict) -> str:
-    """The key a server is pinned under: which client, which file, which
-    project (Claude Code's local scope) and which name. JSON, so no two
-    servers can share one."""
-    return json.dumps([result.get("client"), result.get("path"),
+    """The key a server is pinned under: which client, which file (its real
+    path), which project (Claude Code's local scope) and which name. JSON,
+    so no two servers can share one."""
+    return json.dumps([result.get("client"), real_path(result.get("path")),
                        result.get("project"), result.get("name")],
                       ensure_ascii=False)
+
+
+def key_parts(key: str) -> "tuple | None":
+    """(client, path, project, name) of a key, or None for one this version
+    did not write."""
+    try:
+        parts = json.loads(key)
+    except ValueError:
+        return None
+    if isinstance(parts, list) and len(parts) == 4:
+        return tuple(parts)
+    return None
+
+
+def plan_prune(servers: dict, results: list[dict]) -> "list[str]":
+    """The keys whose server is gone: its config file no longer exists, or
+    the file was audited in this run and no longer holds that server. A
+    server in a file this run did not read (another --config) is kept."""
+    live = {server_key(r) for r in results}
+    audited = {real_path(r.get("path")) for r in results}
+    stale = []
+    for key in servers:
+        parts = key_parts(key)
+        if parts is None:
+            continue
+        path = parts[1]
+        if key in live:
+            continue
+        if not os.path.exists(str(path)) or path in audited:
+            stale.append(key)
+    return stale
 
 
 def snapshot(tools: list[dict], server: "dict | None") -> dict:

@@ -1,6 +1,6 @@
 # MCP Safety Check: demo workstation
 
-Generated 2026-11-05 21:23 UTC by mcp-gradecard 0.4.0 · 1 config file(s) · 4 server(s) · static audit
+Generated 2026-11-05 22:19 UTC by mcp-gradecard 0.4.0 · 1 config file(s) · 4 server(s) · static audit
 
 **Overall grade: F** (the lowest grade of any server)
 
@@ -14,58 +14,58 @@ Generated 2026-11-05 21:23 UTC by mcp-gradecard 0.4.0 · 1 config file(s) · 4 s
 
 | Severity | Server | Finding |
 |---|---|---|
-| CRITICAL | quick-setup | **Launch command downloads or runs code through a shell**: server runs 'curl' inside 'bash' — a downloader/shell, not a server binary |
-| CRITICAL | quick-setup | **Downloaded script piped straight into a shell**: command pipes content into a shell (classic curl\|sh pattern) |
-| CRITICAL | quick-setup | **Remote endpoint baked into the launch**: remote endpoint in args: https://get.tools.example/... |
-| HIGH | vendor-crm | **Remote MCP server reached without TLS**: remote MCP server in 'url' is reached over plain http:// (no TLS): anyone on the network path can read its traffic, including any token, and rewrite the tool descriptions your agent reads; use https:// |
-| HIGH | vendor-crm | **Credential written into a server URL**: credential written into the server URL in 'url' (api\_key): URLs are kept in logs, proxies and history, and MCP access tokens must not travel in the query string; send it in an Authorization header that references an environment variable |
+| CRITICAL | `quick-setup` | **Launch command downloads or runs code through a shell**: server runs 'curl' inside 'bash' — a downloader/shell, not a server binary |
+| CRITICAL | `quick-setup` | **Downloaded script piped straight into a shell**: command pipes content into a shell (classic curl\|sh pattern) |
+| CRITICAL | `quick-setup` | **Remote endpoint baked into the launch**: remote endpoint in args: https\[:\]//get.tools.example/... |
+| HIGH | `vendor-crm` | **Remote MCP server reached without TLS**: remote MCP server in 'url' is reached over plain http\[:\]// (no TLS): anyone on the network path can read its traffic, including any token, and rewrite the tool descriptions your agent reads; use https\[:\]// |
+| HIGH | `vendor-crm` | **Credential written into a server URL**: credential written into a URL in 'url' (api\_key): URLs are kept in logs, proxies and shell history; keeping credentials out of URLs is standard practice. Send it in an Authorization header that references an environment variable |
 
 ## Servers
 
 | Grade | Server | Client | Score | Findings |
 |---|---|---|---|---|
-| F | quick-setup | explicit | 0/100 | 3 |
-| D | vendor-crm | explicit | 50/100 | 3 |
-| B | github | explicit | 75/100 | 3 |
-| A | filesystem | explicit | 100/100 | 0 |
+| F | `quick-setup` | `explicit` | 0/100 | 3 |
+| D | `vendor-crm` | `explicit` | 50/100 | 3 |
+| B | `github` | `explicit` | 75/100 | 3 |
+| A | `filesystem` | `explicit` | 100/100 | 0 |
 
 ## Findings by server
 
-### [F] quick-setup (explicit, 0/100)
+### [F] `quick-setup` (`explicit`, 0/100)
 
-examples/demo-mcp.json
+`examples/demo-mcp.json`
 
 | Severity | Check | Finding | OWASP MCP |
 |---|---|---|---|
 | CRITICAL | suspicious-command | **Launch command downloads or runs code through a shell**: server runs 'curl' inside 'bash' — a downloader/shell, not a server binary | MCP05, MCP04 |
 | CRITICAL | pipe-to-shell | **Downloaded script piped straight into a shell**: command pipes content into a shell (classic curl\|sh pattern) | MCP05, MCP04 |
-| CRITICAL | exfiltration-endpoint | **Remote endpoint baked into the launch**: remote endpoint in args: https://get.tools.example/... | MCP10, MCP04 |
+| CRITICAL | exfiltration-endpoint | **Remote endpoint baked into the launch**: remote endpoint in args: https\[:\]//get.tools.example/... | MCP10, MCP04 |
 
 What to do:
 
-- **Launch command downloads or runs code through a shell**: Replace the entry with a pinned package (npx pkg@1.2.3, uvx pkg==1.2.3) or a local binary you have reviewed. \`--fix --remove\` can delete it.
-- **Downloaded script piped straight into a shell**: Never run \`curl ... \| sh\` from an MCP config: download, review and pin the script, or install the server from a package registry. \`--fix --remove\` can delete it.
-- **Remote endpoint baked into the launch**: Confirm the host is one you expect this server to talk to. If it is yours, trust it with \`--allow-host\`; if not, remove the server.
+- **Launch command downloads or runs code through a shell**: Replace the entry with a pinned package (npx pkg@1.2.3, uvx pkg==1.2.3) or a local binary you have reviewed. `--fix --remove` can delete it.
+- **Downloaded script piped straight into a shell**: Never run `curl ... | sh` from an MCP config: download, review and pin the script, or install the server from a package registry. `--fix --remove` can delete it.
+- **Remote endpoint baked into the launch**: Confirm the host is one you expect this server to talk to. If it is yours, trust it with `--allow-host`; if not, remove the server.
 
-### [D] vendor-crm (explicit, 50/100)
+### [D] `vendor-crm` (`explicit`, 50/100)
 
-examples/demo-mcp.json
+`examples/demo-mcp.json`
 
 | Severity | Check | Finding | OWASP MCP |
 |---|---|---|---|
-| HIGH | insecure-transport | **Remote MCP server reached without TLS**: remote MCP server in 'url' is reached over plain http:// (no TLS): anyone on the network path can read its traffic, including any token, and rewrite the tool descriptions your agent reads; use https:// | MCP07, MCP03 |
-| HIGH | credential-in-url | **Credential written into a server URL**: credential written into the server URL in 'url' (api\_key): URLs are kept in logs, proxies and history, and MCP access tokens must not travel in the query string; send it in an Authorization header that references an environment variable | MCP01, MCP07 |
-| MEDIUM | remote-server | **Remote MCP server (traffic leaves the machine)**: remote MCP server URL (traffic leaves the machine): http://mcp.crm-vendor.example/... | MCP10 |
+| HIGH | insecure-transport | **Remote MCP server reached without TLS**: remote MCP server in 'url' is reached over plain http\[:\]// (no TLS): anyone on the network path can read its traffic, including any token, and rewrite the tool descriptions your agent reads; use https\[:\]// | MCP07, MCP03 |
+| HIGH | credential-in-url | **Credential written into a server URL**: credential written into a URL in 'url' (api\_key): URLs are kept in logs, proxies and shell history; keeping credentials out of URLs is standard practice. Send it in an Authorization header that references an environment variable | MCP01, MCP07 |
+| MEDIUM | remote-server | **Remote MCP server (traffic leaves the machine)**: remote MCP server URL (traffic leaves the machine): http\[:\]//mcp.crm-vendor.example/... | MCP10 |
 
 What to do:
 
-- **Remote MCP server reached without TLS**: Use the server's https:// (or wss://) URL. Over plain http anyone on the network can read tokens and rewrite tool descriptions.
+- **Remote MCP server reached without TLS**: Use the server's https\[:\]// (or wss\[:\]//) URL. Over plain http anyone on the network can read tokens and rewrite tool descriptions.
 - **Credential written into a server URL**: Rotate the credential, remove it from the URL and send it in an Authorization header that references an environment variable ("Bearer $\{TOKEN\}"), or use the server's OAuth sign-in.
-- **Remote MCP server (traffic leaves the machine)**: Check you trust the operator with everything your agent will send. Trust a host of your own with \`--allow-host\`.
+- **Remote MCP server (traffic leaves the machine)**: Check you trust the operator with everything your agent will send. Trust a host of your own with `--allow-host`.
 
-### [B] github (explicit, 75/100)
+### [B] `github` (`explicit`, 75/100)
 
-examples/demo-mcp.json
+`examples/demo-mcp.json`
 
 | Severity | Check | Finding | OWASP MCP |
 |---|---|---|---|
@@ -79,9 +79,9 @@ What to do:
 - **Secrets handed to the server**: Give the server a token with the narrowest scope and shortest life that works, and only to servers you trust.
 - **Credential stored in plain text in the config**: Move the value to your OS keychain or shell environment and reference it ("$\{TOKEN\}" where the client supports it). In a project file: rotate it and make sure the file is not committed.
 
-### [A] filesystem (explicit, 100/100)
+### [A] `filesystem` (`explicit`, 100/100)
 
-examples/demo-mcp.json
+`examples/demo-mcp.json`
 
 No findings.
 

@@ -1603,56 +1603,160 @@ _CREDENTIAL_PARAMS = frozenset({
     "key", "apikey", "api_key", "api-key", "token", "access_token",
     "accesstoken", "auth", "authorization", "secret", "client_secret",
     "password", "pass", "pwd", "sig", "signature", "jwt", "x-api-key"})
+#: The parameters that carry an OAuth-style access token, which the MCP
+#: authorization spec (2025-06-18, Access Token Usage, Token Requirements)
+#: says MUST NOT be in the URI query string. For the rest (a static API key)
+#: keeping it out of URLs is good practice, not the spec.
+_ACCESS_TOKEN_PARAMS = frozenset({"token", "access_token", "accesstoken",
+                                  "jwt", "bearer", "auth", "authorization"})
 _MAX_PARAMS = 64        # query parameters looked at in one URL
+#: A value that is a placeholder someone forgot to fill in, not a secret:
+#: `YOUR_API_KEY_HERE`, `<YOUR_TOKEN>`, `xxxx`, `changeme`, `REPLACE_ME`.
+_PLACEHOLDER_RE = re.compile(
+    r"(?i)^\s*(?:<[^<>]*>|\[[^\[\]]*\]|\{\{[^{}]*\}\}|"
+    r".*\byour[_\- ]?\w*|.*_here\b.*|.*(?<![a-z0-9])(?:replace|changeme|"
+    r"change[_\-]me|placeholder|insert[_\- ]|todo|dummy)(?![a-z0-9]).*|"
+    r"[x*.\-_]{3,}|"
+    r"(?:sk-|ghp_|xox[a-z]-)?x{4,}.*)\s*$")
+#: Path segments that are a secret by their shape wherever they appear.
+_PATH_SECRET_RE = re.compile(r"^(?:fc-[A-Za-z0-9]{16,})$")
+#: Hosts known to put a secret in the URL path (Zapier MCP: /s/<secret>/,
+#: /mcp/<secret>/): a long random-looking segment there is a credential.
+_PATH_SECRET_HOSTS = ("zapier.com", "firecrawl.dev")
+#: A scheme://... in an argument or an env value (database URLs too).
+_ANY_URL_RE = re.compile(r"[A-Za-z][A-Za-z0-9+.\-]{1,20}://[^\s'\"<>`]+")
+_MAX_URLS_IN_TEXT = 32
 
 
-def _url_credentials(url: str) -> "list[str]":
-    """Where a URL carries a literal credential, as fixed words or parameter
-    names: "userinfo" for a `user:password@`, and the name of each query
-    parameter whose name says it is a credential and whose value is not a
-    reference (`${TOKEN}`). Never a value."""
+def is_placeholder(value: str) -> bool:
+    """A value that only stands in for a credential (see _PLACEHOLDER_RE)."""
+    return bool(_PLACEHOLDER_RE.match(str(value)[:200]))
+
+
+def _random_looking(segment: str) -> bool:
+    """A long segment with letters and digits mixed and many different
+    characters: a key, not a word or a slug."""
+    if len(segment) < 20 or not re.fullmatch(r"[A-Za-z0-9_\-]+", segment):
+        return False
+    if not (re.search(r"[0-9]", segment) and re.search(r"[A-Za-z]", segment)):
+        return False
+    import math
+    counts = {c: segment.count(c) for c in set(segment)}
+    entropy = -sum(n / len(segment) * math.log2(n / len(segment))
+                   for n in counts.values())
+    return entropy >= 3.5
+
+
+def _url_credentials(url: str) -> "list[tuple[str, str]]":
+    """Where a URL carries a credential, as (where, kind) pairs. `where` is a
+    fixed word or a parameter name - "userinfo" for `user:password@`, "path"
+    for a secret in the path, or the name of a credential query parameter -
+    and `kind` is "literal", "reference" (`?token=${TOKEN}`: the secret is
+    kept elsewhere but still travels in the URL) or "access-token" (a
+    literal in a parameter that holds an OAuth-style access token).
+    Placeholders (`YOUR_API_KEY`) are not credentials. Never a value."""
     import urllib.parse
     text = url.strip().translate(urls.DROPPED)
-    found: "list[str]" = []
+    found: "list[tuple[str, str]]" = []
     try:
         parts = urllib.parse.urlsplit(text)
-        if parts.password:
-            found.append("userinfo")
+        password = parts.password
+        host = (parts.hostname or "").lower()
     except ValueError:
         return found
+    if password and not is_placeholder(urllib.parse.unquote(password)):
+        found.append(("userinfo", "reference" if _REFERENCE_RE.search(
+            password) else "literal"))
+    segments = [urllib.parse.unquote(p) for p in parts.path.split("/") if p]
+    known = any(host == h or host.endswith("." + h)
+                for h in _PATH_SECRET_HOSTS)
+    if any(_PATH_SECRET_RE.match(seg) or redact.TOKEN_SHAPES_RE.fullmatch(seg)
+           or (known and _random_looking(seg)) for seg in segments[:32]):
+        found.append(("path", "literal"))
     pairs = urllib.parse.parse_qsl(parts.query, keep_blank_values=False,
                                    max_num_fields=None)[:_MAX_PARAMS]
     for key, value in pairs:
         low = key.strip().lower()
-        if not value.strip() or _REFERENCE_RE.search(value):
+        if not value.strip() or is_placeholder(value):
             continue
-        if low in _CREDENTIAL_PARAMS or redact.is_secret_name(key):
-            shown = redact.sanitize(key.strip())[:40] or "?"
-            if shown not in found:
-                found.append(shown)
+        if not (low in _CREDENTIAL_PARAMS or redact.is_secret_name(key)):
+            continue
+        shown = redact.sanitize(key.strip())[:40] or "?"
+        if _REFERENCE_RE.search(value):
+            kind = "reference"
+        elif low in _ACCESS_TOKEN_PARAMS:
+            kind = "access-token"
+        else:
+            kind = "literal"
+        if shown not in [w for w, _k in found]:
+            found.append((shown, kind))
     return found
+
+
+def _url_cred_findings(where: str, url: str, literal_sev: str
+                       ) -> "list[dict]":
+    """credential-in-url findings for one URL: `literal_sev` for a written
+    out secret, medium for a reference that still travels in the URL."""
+    found = _url_credentials(url)
+    out = []
+    literal = [w for w, k in found if k != "reference"]
+    if literal:
+        spec = any(k == "access-token" for _w, k in found)
+        out.append(_finding(
+            literal_sev, "credential-in-url",
+            f"credential written into a URL in {where} ({_listed_names(literal)}"
+            "): URLs are kept in logs, proxies and shell history"
+            + ("; the MCP authorization spec says access tokens MUST NOT be "
+               "in the query string" if spec else
+               "; keeping credentials out of URLs is standard practice")
+            + ". Send it in an Authorization header that references an "
+            "environment variable"))
+    refs = [w for w, k in found if k == "reference"]
+    if refs:
+        out.append(_finding(
+            "medium", "credential-in-url",
+            f"credential passed in a URL in {where} ({_listed_names(refs)}) "
+            "through a variable reference: the file is clean, but the "
+            "secret still travels in the URL, where logs and proxies keep "
+            "it; prefer an Authorization header"))
+    return out
+
+
+def _listed_names(names: "list[str]") -> str:
+    more = f" (+{len(names) - 5} more)" if len(names) > 5 else ""
+    return ", ".join(names[:5]) + more
+
+
+def _urls_in(text: str) -> "list[str]":
+    return _ANY_URL_RE.findall(str(text)[:1_000_000])[:_MAX_URLS_IN_TEXT]
 
 
 def _where_url(key: str) -> str:
     return f"'{key}'" if key in REMOTE_URL_KEYS else key
 
 
+#: Hosts that are this machine seen from inside a container: plain http to
+#: them stays on the machine's own virtual network.
+_CONTAINER_HOSTS = ("host.docker.internal", "gateway.docker.internal",
+                    "host.containers.internal")
+
+
 def detect_transport(name: str, cfg: dict) -> list[dict]:
-    """How a remote server's own URL (`url`, `serverUrl`) is reached.
+    """How a remote server is reached, and credentials in URLs.
 
-    * Plain http/ws to a host that is not this machine: whoever is on the
-      network path reads the traffic (a token too) and can rewrite the tool
-      list and descriptions the agent reads - tool poisoning without touching
-      the server. High; medium when every host it can be read as is a
-      private LAN address.
-    * A literal credential in the URL (a `?api_key=` or `user:pass@`): URLs
-      end up in logs, proxies, shell history and crash reports, and the MCP
-      authorization spec says access tokens must not go in the query string.
-      High.
+    * Plain http/ws to a host that is not this machine (the entry's `url` or
+      `serverUrl`, or the server a bridge such as `mcp-remote` is told to
+      reach): whoever is on the network path reads the traffic (a token too)
+      and can rewrite the tool list the agent reads - tool poisoning without
+      touching the server. High; medium when every host it can be read as is
+      a private LAN address or the container host (host.docker.internal).
+    * A credential in a URL - a `user:password@`, a credential query
+      parameter, a secret in the path (`fc-...`, a Zapier /s/<secret>/) - in
+      those URLs and in any URL in the arguments (high) or env values
+      (medium: a plain-text secret in the file). A `${VAR}` reference that
+      still puts the secret in the URL is medium. Placeholders are skipped.
 
-    The URLs are the entry's own (`url`, `serverUrl`) and the server a
-    bridge (`mcp-remote`, `mcp-proxy`, `supergateway`) is told to reach. Only
-    parameter names are printed, never a value."""
+    Only parameter names are printed, never a value."""
     findings = []
     targets = list(remote_urls(cfg))
     try:
@@ -1661,33 +1765,43 @@ def detect_transport(name: str, cfg: dict) -> list[dict]:
                     if role.kind == "bridge"]
     except RecursionError:
         pass    # detect_exfiltration reports an entry it cannot read
+    checked = set()
     for key, url in targets:
+        checked.add(url)
         try:
             parsed = urls.parse(url)
         except urls.UnparseableUrl:
-            continue    # detect_exfiltration reports it
+            parsed = None    # detect_exfiltration reports it
         hosts = [r for r in parsed.readings
-                 if not (r.exact and _is_local(r.host))]
-        if parsed.scheme in ("http", "ws") and hosts:
-            lan = all(r.exact and _is_lan(r.host) for r in hosts)
+                 if not (r.exact and _is_local(r.host))] if parsed else []
+        if parsed and parsed.scheme in ("http", "ws") and hosts:
+            near = all(r.exact and (_is_lan(r.host)
+                                    or r.host in _CONTAINER_HOSTS)
+                       for r in hosts)
             findings.append(_finding(
-                "medium" if lan else "high", "insecure-transport",
-                f"remote MCP server in {_where_url(key)} is reached over plain "
-                f"{parsed.scheme}:// (no TLS): anyone on the network path can "
-                "read its traffic, including any token, and rewrite the tool "
-                "descriptions your agent reads; use "
+                "medium" if near else "high", "insecure-transport",
+                f"remote MCP server in {_where_url(key)} is reached over "
+                f"plain {parsed.scheme}:// (no TLS): anyone on the network "
+                "path can read its traffic, including any token, and rewrite "
+                "the tool descriptions your agent reads; use "
                 f"{'https' if parsed.scheme == 'http' else 'wss'}://"))
-        creds = _url_credentials(url)
-        if creds:
-            shown = ", ".join(creds[:5])
-            more = f" (+{len(creds) - 5} more)" if len(creds) > 5 else ""
-            findings.append(_finding(
-                "high", "credential-in-url",
-                f"credential written into the server URL in {_where_url(key)} "
-                f"({shown}{more}): URLs are kept in logs, proxies and "
-                "history, and MCP access tokens must not travel in the query "
-                "string; send it in an Authorization header that references "
-                "an environment variable"))
+        findings += _url_cred_findings(_where_url(key), url, "high")
+    seen = {(f["severity"], f["message"]) for f in findings}
+    units = [("args", str(a)) for a in cfg.get("args") or []]
+    env = cfg.get("env")
+    if isinstance(env, dict):
+        units += [(f"env:{redact.sanitize(str(k))[:60]}", str(v))
+                  for k, v in env.items()]
+    for where, text in units:
+        for url in _urls_in(text):
+            if url in checked:
+                continue
+            for f in _url_cred_findings(
+                    where, url, "medium" if where.startswith("env:")
+                    else "high"):
+                if (f["severity"], f["message"]) not in seen:
+                    seen.add((f["severity"], f["message"]))
+                    findings.append(f)
     return findings
 
 
@@ -1696,8 +1810,10 @@ def _is_literal_secret(key: str, value) -> bool:
     if not isinstance(value, str):
         return False
     text = value.strip()
-    if not text or _REFERENCE_RE.search(text):
+    if not text or _REFERENCE_RE.search(text) or is_placeholder(text):
         return False
+    if _urls_in(text):
+        return False    # a URL with a password in it: detect_transport
     if redact.TOKEN_SHAPES_RE.search(text):
         return True
     return (redact.is_secret_name(str(key)) and len(text) >= 8

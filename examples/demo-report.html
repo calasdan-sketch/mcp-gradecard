@@ -61,7 +61,7 @@ a{color:inherit}
 @media (max-width:640px){th.hide,td.hide{display:none}}
 </style></head><body><main>
 <h1>MCP Safety Check: demo workstation</h1>
-<div class="meta">Generated 2026-11-05 21:23 UTC by mcp-gradecard 0.4.0 &middot; 1 config file(s) &middot; 4 server(s) &middot; static audit</div>
+<div class="meta">Generated 2026-11-05 22:19 UTC by mcp-gradecard 0.4.0 &middot; 1 config file(s) &middot; 4 server(s) &middot; static audit</div>
 <section class="card hero">
 <div class="grade g-F" aria-label="grade F">F</div>
 <div>
@@ -79,7 +79,7 @@ a{color:inherit}
 <tr><td><span class="sev s-critical">critical</span></td><td class="nm">quick-setup</td><td class="msg"><strong>Downloaded script piped straight into a shell</strong><br>command pipes content into a shell (classic curl|sh pattern)</td></tr>
 <tr><td><span class="sev s-critical">critical</span></td><td class="nm">quick-setup</td><td class="msg"><strong>Remote endpoint baked into the launch</strong><br>remote endpoint in args: https://get.tools.example/...</td></tr>
 <tr><td><span class="sev s-high">high</span></td><td class="nm">vendor-crm</td><td class="msg"><strong>Remote MCP server reached without TLS</strong><br>remote MCP server in &#x27;url&#x27; is reached over plain http:// (no TLS): anyone on the network path can read its traffic, including any token, and rewrite the tool descriptions your agent reads; use https://</td></tr>
-<tr><td><span class="sev s-high">high</span></td><td class="nm">vendor-crm</td><td class="msg"><strong>Credential written into a server URL</strong><br>credential written into the server URL in &#x27;url&#x27; (api_key): URLs are kept in logs, proxies and history, and MCP access tokens must not travel in the query string; send it in an Authorization header that references an environment variable</td></tr>
+<tr><td><span class="sev s-high">high</span></td><td class="nm">vendor-crm</td><td class="msg"><strong>Credential written into a server URL</strong><br>credential written into a URL in &#x27;url&#x27; (api_key): URLs are kept in logs, proxies and shell history; keeping credentials out of URLs is standard practice. Send it in an Authorization header that references an environment variable</td></tr>
 </table></section>
 <h2>Servers</h2><section class="card"><table>
 <tr><th>Grade</th><th>Server</th><th class="hide">Client</th><th>Score</th><th>Findings</th></tr>
@@ -108,7 +108,7 @@ a{color:inherit}
 <div><h3>vendor-crm <span class="meta">&lt;explicit&gt; &middot; 50/100</span></h3><div class="path">examples/demo-mcp.json</div></div></div>
 <table><tr><th>Severity</th><th>Finding</th><th class="hide">OWASP MCP</th></tr>
 <tr><td><span class="sev s-high">high</span></td><td class="msg"><strong>Remote MCP server reached without TLS</strong> <span class="meta">(insecure-transport)</span><br>remote MCP server in &#x27;url&#x27; is reached over plain http:// (no TLS): anyone on the network path can read its traffic, including any token, and rewrite the tool descriptions your agent reads; use https://</td><td class="hide"><span class="tag" title="Insufficient Authentication &amp; Authorization">MCP07</span><span class="tag" title="Tool Poisoning">MCP03</span></td></tr>
-<tr><td><span class="sev s-high">high</span></td><td class="msg"><strong>Credential written into a server URL</strong> <span class="meta">(credential-in-url)</span><br>credential written into the server URL in &#x27;url&#x27; (api_key): URLs are kept in logs, proxies and history, and MCP access tokens must not travel in the query string; send it in an Authorization header that references an environment variable</td><td class="hide"><span class="tag" title="Token Mismanagement &amp; Secret Exposure">MCP01</span><span class="tag" title="Insufficient Authentication &amp; Authorization">MCP07</span></td></tr>
+<tr><td><span class="sev s-high">high</span></td><td class="msg"><strong>Credential written into a server URL</strong> <span class="meta">(credential-in-url)</span><br>credential written into a URL in &#x27;url&#x27; (api_key): URLs are kept in logs, proxies and shell history; keeping credentials out of URLs is standard practice. Send it in an Authorization header that references an environment variable</td><td class="hide"><span class="tag" title="Token Mismanagement &amp; Secret Exposure">MCP01</span><span class="tag" title="Insufficient Authentication &amp; Authorization">MCP07</span></td></tr>
 <tr><td><span class="sev s-medium">medium</span></td><td class="msg"><strong>Remote MCP server (traffic leaves the machine)</strong> <span class="meta">(remote-server)</span><br>remote MCP server URL (traffic leaves the machine): http://mcp.crm-vendor.example/...</td><td class="hide"><span class="tag" title="Context Injection &amp; Over-Sharing">MCP10</span></td></tr>
 </table>
 <p class="meta" style="margin:12px 0 0">What to do</p><ul class="fix">
