@@ -1,6 +1,6 @@
 # mcp-gradecard
 
-Formerly mcp-audit (renamed for PyPI; the GitHub repository is now calasdan-sketch/mcp-gradecard, and GitHub redirects the old URL). The old `mcp-audit` command still works as an alias.
+Formerly mcp-audit (renamed for PyPI; the GitHub repository is now calasdan-sketch/mcp-gradecard). The old `mcp-audit` command still works as an alias.
 
 **An offline, zero-dependency security audit of every MCP server your AI
 agents can use, graded A to F, with a report you can hand to someone.**
