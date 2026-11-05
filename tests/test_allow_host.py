@@ -109,11 +109,12 @@ class TestWhatAHostIsTrustedFor(unittest.TestCase):
             self.assertEqual(self.remote(url, "*.example.com"), medium, url)
 
     def test_only_over_https_or_wss(self):
-        medium = [("medium", "remote-server")]
+        # plain http/ws is never trusted, and is a transport finding too
+        loud = [("high", "insecure-transport"), ("medium", "remote-server")]
         self.assertEqual(self.remote("http://mcp.example.com/mcp",
-                                     "mcp.example.com"), medium)
+                                     "mcp.example.com"), loud)
         self.assertEqual(self.remote("ws://mcp.example.com/ws",
-                                     "mcp.example.com"), medium)
+                                     "mcp.example.com"), loud)
 
     def test_a_trusted_name_in_a_url_that_is_not_its_host_does_not_count(self):
         medium = [("medium", "remote-server")]

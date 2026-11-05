@@ -66,9 +66,11 @@ class TestAServerUrlIsAUrl(unittest.TestCase):
             with self.subTest(key):
                 self.assertEqual(
                     audit({key: "https://mcp.vendor.example/sse"}, allow), [])
+                # plain http: never trusted, and a transport finding (0.4.0)
                 self.assertEqual(
                     checks(audit({key: "http://mcp.vendor.example/sse"},
-                                 allow)), [REMOTE])
+                                 allow)),
+                    [REMOTE, ("high", "insecure-transport")])
 
     def test_a_url_that_cannot_be_taken_apart_names_the_key(self):
         for key in KEYS:
@@ -149,12 +151,15 @@ class TestThroughTheCommandLine(unittest.TestCase):
                 self.assertNotIn("unauditable", out)
         results = {r["name"]: r for r in json.loads(outs["json"][1])["results"]}
         # the literal "Authorization: Bearer ..." is itself a finding now
+        # and so is the literal `?token=` in the URL (0.4.0)
         self.assertEqual(checks(results["vendor"]["findings"]),
-                         [REMOTE, ("medium", "secret-header")])
+                         [REMOTE, ("medium", "secret-header"),
+                          ("high", "credential-in-url")])
         self.assertEqual(results["local"]["findings"], [])
         sarif = json.loads(outs["sarif"][1])
         self.assertEqual({r["ruleId"] for r in sarif["runs"][0]["results"]},
-                         {"remote-server", "secret-header"})
+                         {"remote-server", "secret-header",
+                          "credential-in-url"})
 
 
 class TestAUrlDoesNotHideTheLaunch(unittest.TestCase):

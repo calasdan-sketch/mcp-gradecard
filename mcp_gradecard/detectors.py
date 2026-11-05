@@ -1597,6 +1597,146 @@ def detect_secret_header(name: str, cfg: dict) -> list[dict]:
         f"environment-variable reference instead")]
 
 
+#: Query parameters that carry a credential although is_secret_name() does
+#: not know the word (it is tuned for variable names).
+_CREDENTIAL_PARAMS = frozenset({
+    "key", "apikey", "api_key", "api-key", "token", "access_token",
+    "accesstoken", "auth", "authorization", "secret", "client_secret",
+    "password", "pass", "pwd", "sig", "signature", "jwt", "x-api-key"})
+_MAX_PARAMS = 64        # query parameters looked at in one URL
+
+
+def _url_credentials(url: str) -> "list[str]":
+    """Where a URL carries a literal credential, as fixed words or parameter
+    names: "userinfo" for a `user:password@`, and the name of each query
+    parameter whose name says it is a credential and whose value is not a
+    reference (`${TOKEN}`). Never a value."""
+    import urllib.parse
+    text = url.strip().translate(urls.DROPPED)
+    found: "list[str]" = []
+    try:
+        parts = urllib.parse.urlsplit(text)
+        if parts.password:
+            found.append("userinfo")
+    except ValueError:
+        return found
+    pairs = urllib.parse.parse_qsl(parts.query, keep_blank_values=False,
+                                   max_num_fields=None)[:_MAX_PARAMS]
+    for key, value in pairs:
+        low = key.strip().lower()
+        if not value.strip() or _REFERENCE_RE.search(value):
+            continue
+        if low in _CREDENTIAL_PARAMS or redact.is_secret_name(key):
+            shown = redact.sanitize(key.strip())[:40] or "?"
+            if shown not in found:
+                found.append(shown)
+    return found
+
+
+def _where_url(key: str) -> str:
+    return f"'{key}'" if key in REMOTE_URL_KEYS else key
+
+
+def detect_transport(name: str, cfg: dict) -> list[dict]:
+    """How a remote server's own URL (`url`, `serverUrl`) is reached.
+
+    * Plain http/ws to a host that is not this machine: whoever is on the
+      network path reads the traffic (a token too) and can rewrite the tool
+      list and descriptions the agent reads - tool poisoning without touching
+      the server. High; medium when every host it can be read as is a
+      private LAN address.
+    * A literal credential in the URL (a `?api_key=` or `user:pass@`): URLs
+      end up in logs, proxies, shell history and crash reports, and the MCP
+      authorization spec says access tokens must not go in the query string.
+      High.
+
+    The URLs are the entry's own (`url`, `serverUrl`) and the server a
+    bridge (`mcp-remote`, `mcp-proxy`, `supergateway`) is told to reach. Only
+    parameter names are printed, never a value."""
+    findings = []
+    targets = list(remote_urls(cfg))
+    try:
+        targets += [(f"the {role.via} bridge's URL", role.value)
+                    for role in _roles(cfg)[:_MAX_ROLES]
+                    if role.kind == "bridge"]
+    except RecursionError:
+        pass    # detect_exfiltration reports an entry it cannot read
+    for key, url in targets:
+        try:
+            parsed = urls.parse(url)
+        except urls.UnparseableUrl:
+            continue    # detect_exfiltration reports it
+        hosts = [r for r in parsed.readings
+                 if not (r.exact and _is_local(r.host))]
+        if parsed.scheme in ("http", "ws") and hosts:
+            lan = all(r.exact and _is_lan(r.host) for r in hosts)
+            findings.append(_finding(
+                "medium" if lan else "high", "insecure-transport",
+                f"remote MCP server in {_where_url(key)} is reached over plain "
+                f"{parsed.scheme}:// (no TLS): anyone on the network path can "
+                "read its traffic, including any token, and rewrite the tool "
+                "descriptions your agent reads; use "
+                f"{'https' if parsed.scheme == 'http' else 'wss'}://"))
+        creds = _url_credentials(url)
+        if creds:
+            shown = ", ".join(creds[:5])
+            more = f" (+{len(creds) - 5} more)" if len(creds) > 5 else ""
+            findings.append(_finding(
+                "high", "credential-in-url",
+                f"credential written into the server URL in {_where_url(key)} "
+                f"({shown}{more}): URLs are kept in logs, proxies and "
+                "history, and MCP access tokens must not travel in the query "
+                "string; send it in an Authorization header that references "
+                "an environment variable"))
+    return findings
+
+
+def _is_literal_secret(key: str, value) -> bool:
+    """An env value that is a credential written out, not a reference."""
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    if not text or _REFERENCE_RE.search(text):
+        return False
+    if redact.TOKEN_SHAPES_RE.search(text):
+        return True
+    return (redact.is_secret_name(str(key)) and len(text) >= 8
+            and " " not in text)
+
+
+def detect_plaintext_secret(name: str, cfg: dict) -> list[dict]:
+    """A credential written into the config file itself (an env value such as
+    `"GITHUB_TOKEN": "ghp_..."`) rather than a reference to one kept
+    elsewhere: anyone and anything that can read the file - a backup, a sync
+    folder, another tool, a commit - has it. Low here; the CLI raises it to
+    high for a project file, which is usually committed (see
+    escalate_project_secrets). Only names are printed."""
+    env = cfg.get("env")
+    if not isinstance(env, dict):
+        return []
+    names = sorted(str(k) for k, v in env.items() if _is_literal_secret(k, v))
+    if not names:
+        return []
+    shown = ", ".join(redact.sanitize(n)[:60] for n in names[:5])
+    more = f" (+{len(names) - 5} more)" if len(names) > 5 else ""
+    return [_finding(
+        "low", "plaintext-secret",
+        f"credential stored in plain text in the config file: env {shown}"
+        f"{more} — anything that can read this file has it; keep it in "
+        "your OS keychain or shell environment and reference it")]
+
+
+def escalate_project_secrets(findings: list[dict]) -> None:
+    """A plain-text secret in a project file (./.mcp.json, ./.cursor/...) is
+    one `git add` from being public: raise it to high and say so."""
+    for f in findings:
+        if f["check"] == "plaintext-secret" and f["severity"] == "low":
+            f["severity"] = "high"
+            f["message"] += (" (this is a project file, which is usually "
+                             "committed to version control: rotate the "
+                             "credential if it has been pushed)")
+
+
 # -- Containers ---------------------------------------------------------------
 
 _CONTAINER_RUNTIMES = frozenset({"docker", "podman", "nerdctl"})
@@ -1708,6 +1848,8 @@ STATIC_DETECTORS = (
     detect_floating_version,
     detect_secret_env,
     detect_secret_header,
+    detect_plaintext_secret,
+    detect_transport,
     detect_container_escape,
 )
 
@@ -1721,6 +1863,8 @@ DETECTOR_SUBJECT = {
     "detect_floating_version": "package pinning",
     "detect_secret_env": "secrets in env",
     "detect_secret_header": "secrets in headers",
+    "detect_plaintext_secret": "plain-text secrets",
+    "detect_transport": "how a remote server is reached",
     "detect_container_escape": "container options",
 }
 

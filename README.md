@@ -2,14 +2,69 @@
 
 Formerly mcp-audit (renamed for PyPI; the GitHub repo keeps its old name). The old `mcp-audit` command still works as an alias.
 
+**An offline, zero-dependency security audit of every MCP server your AI
+agents can use, graded A to F, with a report you can hand to someone.**
+
 `npm audit` for your agent's MCP tool supply chain. Scans every MCP server
 installed across your clients (Claude Code incl. its per-project "local" scope
 and project `.mcp.json`, Claude Desktop, Cursor, VS Code, Copilot CLI,
 Windsurf/Devin, Zed) and flags what can hurt you: prompt-injection in tool
-descriptions, exfiltration endpoints baked into configs, known-vulnerable
-packages, floating version pins, and secrets handed to servers via env.
+descriptions, tool definitions that change after you approved them (rug
+pulls), servers that talk about each other's tools (shadowing), exfiltration
+endpoints baked into configs, plain-http servers and tokens in URLs,
+known-vulnerable packages, floating version pins, and secrets in configs.
+Nothing is sent anywhere: no account, no API key, no telemetry.
 
 Thousands of one-line-install MCP servers, ~zero vetting. This is the vetting.
+
+### Quick start
+
+```bash
+pip install git+https://github.com/calasdan-sketch/mcp-audit
+mcp-gradecard                                   # terminal report
+mcp-gradecard --format html > mcp-report.html   # a report to read or share
+```
+
+A finished report for a small demo config is in
+[`examples/demo-report.html`](examples/demo-report.html) (and
+[`.md`](examples/demo-report.md)); the config it audits is
+[`examples/demo-mcp.json`](examples/demo-mcp.json). The terminal version:
+
+```text
+  [F] quick-setup  (0/100)  <explicit>
+        [CRITICAL] server runs 'curl' inside 'bash' — a downloader/shell, not a server binary
+        [CRITICAL] command pipes content into a shell (classic curl|sh pattern)
+  [D] vendor-crm  (50/100)  <explicit>
+        [HIGH    ] remote MCP server in 'url' is reached over plain http:// (no TLS): ...
+        [HIGH    ] credential written into the server URL in 'url' (api_key): ...
+  [B] github  (75/100)  <explicit>
+        [MEDIUM  ] unpinned package '@modelcontextprotocol/server-github' — ...
+        [LOW     ] credential stored in plain text in the config file: env GITHUB_PERSONAL_ACCESS_TOKEN — ...
+  [A] filesystem  (100/100)  <explicit>
+        ✓ no findings
+```
+
+### How it compares
+
+Statements about other tools are taken from their own pages or a cited
+review, read on 2026-11-05; check them before you rely on them.
+
+| | mcp-gradecard | [Snyk Agent Scan](https://pypi.org/project/snyk-agent-scan/) (was Invariant mcp-scan) | [Cisco MCP Scanner](https://pypi.org/project/cisco-ai-mcp-scanner/) | [mcp-audit (A. Dudley)](https://appsecsanta.com/mcp-audit) |
+|---|---|---|---|---|
+| Runs fully offline, no account | yes | no: needs a `SNYK_TOKEN`, tool names and descriptions go to Snyk | YARA/static yes; LLM, AI Defense and VirusTotal engines need keys | yes |
+| Asks before launching servers | yes: lists them, skips critical and project ones | added after a [2026 report](https://dev.to/pachilo/execute-first-ask-never-a-vulnerability-in-snyk-agent-scan-4plc) that it ran them unasked | n/a (scans the servers you point it at) | `--connect` is opt-in |
+| Tool poisoning in descriptions | heuristic, 8 languages, decodes hidden/encoded text | yes (hosted analysis) | YARA + optional LLM | 11 patterns |
+| Rug pulls (tool pinning) | `--pins`, local hashes | yes (hashing) | not listed | yes (SHA-256 baseline) |
+| Tool shadowing / cross-server | name collisions and cross-references | yes | not listed | toxic-flow pairs and attack paths |
+| Plain-http servers, tokens in URLs | yes | not listed | protocol probes on unauthenticated HTTP endpoints | credential patterns |
+| Reports | terminal, JSON, SARIF, HTML, Markdown | rich text, JSON | summary, table, JSON and more | terminal, JSON, SARIF, HTML, CycloneDX |
+| OWASP MCP Top 10 mapping | yes | not listed | AITech taxonomy | yes |
+| Dependencies | none (stdlib) | Python package + Snyk service | Python 3.11+, several engines | Python package |
+
+Where others go further: Cisco's scanner can analyse server source code,
+binaries and packages, and use an LLM; Snyk's has hosted analysis and also
+scans agent skills; Dudley's mcp-audit has toxic-flow attack paths, an SBOM
+and Semgrep rules. mcp-gradecard reads configs and live tool lists only.
 
 ## Install
 
@@ -41,7 +96,20 @@ python3 -m mcp_gradecard --deep --probe-project    # launch the project's too
 # Audit a specific file, JSON output for CI, fail the build on highs
 python3 -m mcp_gradecard --config ~/.claude.json --format json --fail-on high
 
-# SARIF 2.1.0 for GitHub code scanning / IDE viewers
+# A report to read or hand over: self-contained HTML (no scripts, nothing
+# loaded from the network) or Markdown, with an overall grade, what to fix
+# first, what to do about each finding and the OWASP MCP Top 10 risks
+python3 -m mcp_gradecard --format html --report-title "MCP Safety Check: ACME laptops" > report.html
+python3 -m mcp_gradecard --format markdown > report.md
+
+# Catch rug pulls: pin every tool definition the first time, report any
+# that change on later runs; accept a reviewed change with --update-pins
+python3 -m mcp_gradecard --deep --pins ~/.mcp-gradecard-pins.json
+python3 -m mcp_gradecard --deep --pins ~/.mcp-gradecard-pins.json --update-pins
+
+# SARIF 2.1.0 for GitHub code scanning / IDE viewers (rules carry a title,
+# remediation, OWASP MCP tags and security-severity; results a stable
+# fingerprint)
 python3 -m mcp_gradecard --format sarif > mcp-gradecard.sarif
 
 # Trust a host of your own (repeatable; https and wss only): a remote MCP
@@ -225,6 +293,13 @@ Weekly cron example (uses the installed console script):
 | `invalid-config` | high | The entry is not an object, or `command`/`args`/`env`/`url`/`serverUrl` has the wrong type |
 | `deep-probe` | low | `--deep` only: the server was not launched (it has critical findings, a `detector-error` or `unparseable-url` or a registry over plain http, it comes from a project file in the current directory, it is disabled in its config, or it is remote), could not be probed (did not start, silent, exited early, sent too much output), or only part of its tools were read |
 | `unauditable` | low | The entry has neither `command` nor `url`/`serverUrl` (for instance a Zed server provided by an extension): what it runs is not in the config |
+| `insecure-transport` | high / medium | A remote server (`url`, `serverUrl`, or the URL a bridge such as `mcp-remote` is given) is reached over plain `http://` or `ws://` to a host that is not this machine: anyone on the network path can read the traffic, tokens included, and rewrite the tool descriptions the agent reads. **Medium** when the host is a private LAN address. Loopback is not reported |
+| `credential-in-url` | high | The same URLs carry a literal credential: a `user:password@`, or a query parameter named like one (`token`, `api_key`, `key`, `access_token`, `password`, `sig`, or any name `secret-env` would flag). A reference (`?token=${TOKEN}`) is not flagged. Only the parameter names are printed. The MCP authorization spec says access tokens must not go in the query string |
+| `plaintext-secret` | low / high | An `env` value that is a credential written out (a known token shape such as `ghp_...` or `sk-...`, or a value of 8+ characters under a credential name) rather than a reference. **High** in a project file (`./.mcp.json`, `./.cursor/mcp.json`, ...), which is usually committed. Only names are printed |
+| `tool-changed` | high | `--deep --pins` only: a tool's definition (any field, schemas included) or the server's instructions changed since they were pinned - a possible rug pull. Reported on every run until accepted with `--update-pins` |
+| `tool-added` | medium | `--deep --pins` only: a tool (or server instructions) that was not there when the server was pinned |
+| `tool-removed` | low | `--deep --pins` only: a pinned tool is gone (not reported when the probe read only part of the list) |
+| `tool-shadowing` | medium / low | `--deep` only. **Medium**: what one server tells the agent names a tool that only another server offers (`"when using send_email, always BCC ..."`) - the way one server hijacks another's tools. Only distinctive names count (snake_case, kebab-case or camelCase, 6+ characters), never plain words such as `search`. **Low**: two servers offer a tool with the same name. Only servers one client loads together are compared, and the same server installed twice is not counted |
 
 Scores: 100 − deductions (critical 40, high 20, medium 10, low 5),
 graded A–F. Severity floor: any single critical finding caps the grade at D,
@@ -634,6 +709,41 @@ server sends (the tests time pathological texts of 100,000 characters). At
 most 100 findings per server are listed; any others are counted in one more.
 The scanner is loaded only by `--deep`.
 
+## `--pins` and shadowing
+
+`--deep --pins FILE` records a SHA-256 of every tool definition each launched
+server sends (the whole definition as sent, schemas included) and of its
+`initialize` instructions. The first run creates FILE (private to your user)
+and says how many tools it pinned; every later run compares and reports
+`tool-changed`, `tool-added` and `tool-removed` until you review the change
+and run once with `--update-pins`. A server seen for the first time is added
+quietly. FILE holds server names, tool names and hashes - never a
+description - and never leaves the machine. A pins file that cannot be read
+or written stops the run with exit 2: a broken file must not switch the
+check off. Servers `--deep` does not launch (held back, disabled, remote)
+are not compared, and keep their pins.
+
+Shadowing needs no flag: after `--deep` has read the tool lists it compares
+them across the servers each client loads together (Claude Code's user,
+local, project and managed files count as one agent; Cursor and Claude
+Desktop are two). See `tool-shadowing` above.
+
+## Reports and OWASP MCP Top 10
+
+`--format html` writes one self-contained page: inline styles only, no
+scripts, nothing loaded from the network (a Content-Security-Policy says so
+to the browser), light and dark themes, and a print layout. `--format
+markdown` says the same in Markdown. Both open with the overall grade (the
+lowest of any server) and the critical and high findings to fix first, then
+give each server its findings, what to do about each kind, and the [OWASP
+MCP Top 10](https://owasp.org/www-project-mcp-top-10/) risks they are
+evidence of, and end with what the audit does not cover. Every name, path and
+message from a config or a server is sanitized and escaped, so a hostile
+server name cannot inject markup. `--report-title` sets the heading.
+
+The mapping from checks to OWASP risks lives in `mcp_gradecard/catalog.py`;
+it is this project's reading, not OWASP's, and OWASP's list is still beta.
+
 ## Advisory feed
 
 The feed ships inside the package as package data (wheel and sdist both
@@ -822,6 +932,22 @@ What mcp-gradecard does not do, so that you do not find out the hard way:
   that its input has closed, as a stdio server is expected to. What Windows
   does to the server when the console window is closed or the user logs off
   is not handled here and not verified.
+
+**`--pins`, shadowing and the reports**
+
+- Pins see what a server sends to mcp-gradecard. A server that answers one
+  client differently from another, or changes only after the probe, is not
+  caught; neither is a change in what a tool does when it is called.
+- Shadowing is matched by tool name in text. A server that refers to another
+  server's tool in a paraphrase, or by a short or ordinary name, is not
+  found; a server that legitimately documents how it works with another
+  (say, a workflow server that names a GitHub tool) is reported and needs a
+  person to read it.
+- A credential in a URL is found by its parameter name or a `user:pass@`.
+  A secret in the URL path (some hosted MCP services put one there) is not
+  recognised.
+- Remote servers' live tool lists are not fetched, so pins and shadowing
+  cover the stdio servers `--deep` launches.
 
 **Platforms**
 

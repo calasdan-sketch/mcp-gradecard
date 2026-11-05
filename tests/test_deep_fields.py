@@ -155,13 +155,18 @@ class TestWhatAToolSaysBesidesItsDescription(FieldCase):
                             for f in found))
 
     def test_a_tool_without_them_has_no_extra_keys(self):
+        # besides `digest`, the hash --pins compares (0.4.0)
+        def texts(probe):
+            for t in probe["tools"]:
+                self.assertRegex(t.pop("digest"), "^[0-9a-f]{64}$")
+            return probe["tools"]
         probe = self.probe([tool()])
-        self.assertEqual(probe["tools"], [{"name": "add",
-                                           "description": CLEAN}])
+        self.assertEqual(texts(probe), [{"name": "add",
+                                         "description": CLEAN}])
         probe = self.probe([tool(annotations={"title": ""},
                                  outputSchema={"type": "object"})])
-        self.assertEqual(probe["tools"], [{"name": "add",
-                                           "description": CLEAN}])
+        self.assertEqual(texts(probe), [{"name": "add",
+                                         "description": CLEAN}])
 
     def test_the_budget_counts_them(self):
         with unittest.mock.patch.object(deep_mod, "MAX_SCANNED", 100):

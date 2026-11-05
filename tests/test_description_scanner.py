@@ -643,6 +643,7 @@ class TestTextsOtherThanTheDescription(unittest.TestCase):
         probe = deep_mod.probe_server({
             "command": sys.executable,
             "args": [os.path.join(FIX, "tools_mcp_server.py"), tools]})
+        probe["tools"][0].pop("digest")     # the hash --pins compares
         self.assertEqual(probe["tools"], [{"name": "add",
                                            "description": "Adds."}])
 

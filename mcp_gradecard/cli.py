@@ -21,7 +21,9 @@ from . import detectors
 from . import discovery
 from . import launch
 from . import redact
+from . import report
 from . import scoring
+from . import toolset
 
 
 def _audit_one(name: str, cfg: dict, group: dict, advisories: list[dict],
@@ -33,6 +35,8 @@ def _audit_one(name: str, cfg: dict, group: dict, advisories: list[dict],
     findings = detectors.audit_server(name, cfg, advisories, allow_hosts)
     if online:
         findings.extend(detectors.detect_osv(name, cfg))
+    if discovery.is_project_client(client):
+        detectors.escalate_project_secrets(findings)
     tools: list[dict] = []
     for f in findings:  # whatever produced it, nothing secret goes out
         f["message"] = redact.clean(f["message"])
@@ -260,12 +264,58 @@ def _deep_pass(results: list[dict], probe_critical: bool,
             if probe["ok"]:
                 r["tools"] = probe["tools"]
                 r["deep_read"] = len(probe["tools"])
+                r["deep_server"] = probe.get("server")
+                r["deep_complete"] = not probe.get("error")
                 new += deep_mod.audit_descriptions(probe["tools"],
                                                    probe.get("server"))
             if probe.get("error"):
                 new.append({"severity": "low", "check": "deep-probe",
                             "message": f"--deep probe: {probe['error']}"})
             _add_findings(r, new)
+
+
+def _toolset_pass(results: list[dict], pins_path: "str | None",
+                  update: bool) -> None:
+    """After --deep: cross-server shadowing, and --pins (rug pulls).
+    Raises toolset.PinsError for a pins file that cannot be used."""
+    shadow = toolset.shadowing(results)
+    for r in results:
+        if id(r) in shadow:
+            _add_findings(r, shadow[id(r)])
+    if not pins_path:
+        return
+    pinned, labels = toolset.load(pins_path) or ({}, {})
+    first = not os.path.exists(pins_path)
+    servers = dict(pinned)
+    changed = False
+    for r in results:
+        if "deep_read" not in r:    # not probed, or the probe failed
+            continue
+        key = toolset.server_key(r)
+        now = toolset.snapshot(r.get("tools") or [], r.get("deep_server"))
+        labels[key] = {"name": r["name"], "client": r["client"],
+                       "path": r["path"]}
+        if key not in servers:
+            servers[key] = now
+            changed = True
+            continue
+        found = toolset.compare(servers[key], now,
+                                r.get("deep_complete", True))
+        if found:
+            _add_findings(r, found)
+            if update:
+                servers[key] = now
+                changed = True
+    if changed or first:
+        toolset.save(pins_path, servers, labels)
+    count = sum(len(t) for t in servers.values())
+    if first:
+        _note(f"--pins: pinned {count} tool definition(s) of "
+              f"{len(servers)} server(s) to {pins_path}; later runs report "
+              "any that change")
+    elif update:
+        _note(f"--update-pins: {pins_path} now holds the tools as they are "
+              "today")
 
 
 # Only unambiguous launch-time attacks are fixable. URL/description/advisory
@@ -629,8 +679,25 @@ def _build_parser() -> argparse.ArgumentParser:
                         "reported. There is no config file: give it on every "
                         "run. Without it only the hosts built in are "
                         "trusted (the README lists them).")
-    p.add_argument("--format", choices=("human", "json", "sarif"),
-                   default="human")
+    p.add_argument("--pins", metavar="FILE", default=None,
+                   help="With --deep: catch rug pulls. The first run stores a "
+                        "SHA-256 of every tool definition (and the server's "
+                        "instructions) in FILE; every later run reports a "
+                        "tool that changed (high), appeared (medium) or went "
+                        "away (low). FILE holds names and hashes only.")
+    p.add_argument("--update-pins", action="store_true",
+                   help="With --pins: after reporting the differences, "
+                        "accept the tools as they are now.")
+    p.add_argument("--format",
+                   choices=("human", "json", "sarif", "html", "markdown"),
+                   default="human",
+                   help="human (default), json, sarif (GitHub code "
+                        "scanning), html (a self-contained report to read "
+                        "or hand over: no scripts, no external resources) "
+                        "or markdown.")
+    p.add_argument("--report-title", metavar="TEXT", default=None,
+                   help="With --format html or markdown: the title on the "
+                        "report (say, who it was prepared for).")
     p.add_argument("--fix", action="store_true",
                    help="List the servers launched via a downloader/shell or "
                         "curl|sh (critical suspicious-command / pipe-to-shell)"
@@ -861,6 +928,15 @@ def _main(argv: list[str] | None) -> int:
         parser.error("--probe-critical only works together with --deep")
     if args.probe_project and not args.deep:
         parser.error("--probe-project only works together with --deep")
+    if args.pins and not args.deep:
+        parser.error("--pins only works together with --deep (pins are "
+                     "taken from the live tool lists)")
+    if args.update_pins and not args.pins:
+        parser.error("--update-pins only works together with --pins")
+    if args.report_title is not None and args.format not in ("html",
+                                                             "markdown"):
+        parser.error("--report-title only works with --format html or "
+                     "markdown")
     try:
         advisories = detectors.load_advisories()
     except detectors.AdvisoryFeedError as e:
@@ -896,6 +972,15 @@ def _main(argv: list[str] | None) -> int:
 
     if args.deep:  # after --fix: once, and never a server --fix just removed
         _deep_pass(results, args.probe_critical, args.probe_project)
+        try:
+            _toolset_pass(results, args.pins, args.update_pins)
+        except (toolset.PinsError, OSError) as e:
+            # A pins file that cannot be read or written would turn the rug
+            # pull check off without a word: no verdict instead.
+            reason = (str(e) if isinstance(e, toolset.PinsError)
+                      else (e.strerror or type(e).__name__))
+            _note(f"error: --pins file '{args.pins}': {reason}")
+            return 2
 
     # Names, paths and project directories come from the config files: what
     # is printed has its control and bidi characters spelled out (sanitize),
@@ -903,6 +988,12 @@ def _main(argv: list[str] | None) -> int:
     if args.format == "sarif":
         print(json.dumps(redact.sanitize_tree(
             scoring.render_sarif(results, __version__)), indent=2))
+    elif args.format in ("html", "markdown"):
+        render = (report.render_html if args.format == "html"
+                  else report.render_markdown)
+        print(render(results, warnings=warnings, configs=discovered,
+                     version=__version__, title=args.report_title,
+                     deep=args.deep))
     elif args.format == "json":
         out = {"results": [{k: r[k] for k in
                             ("name", "client", "path", "project", "findings",

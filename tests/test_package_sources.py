@@ -777,7 +777,7 @@ class TestNoCredentialIsPrinted(unittest.TestCase):
                     for leaked in secrets:
                         self.assertNotIn(leaked, out + err, fmt)
                     self.assertEqual(code, 0, fmt)
-                    if fmt != "human":  # the human report names no check
+                    if fmt in ("json", "sarif"):  # the human report names no check
                         for check in ("git-source", "package-registry",
                                       "remote-server"):
                             self.assertIn(check, out, (fmt, check))
