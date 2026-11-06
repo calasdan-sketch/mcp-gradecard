@@ -18,7 +18,7 @@ import unittest.mock
 
 from mcp_gradecard import discovery, jsonc, redact, scoring
 
-from _support import (client_path, isolated_machine, run_all_formats, run_cli,
+from _support import (as_read, client_path, isolated_machine, run_all_formats, run_cli,
                       write_bytes, write_json, write_text)
 
 ESC = chr(0x1B)
@@ -404,7 +404,7 @@ class TestControlCharactersNeverReachTheTerminal(unittest.TestCase):
             outputs = run_all_formats("--config", p)
         for fmt, (code, out, err) in outputs.items():
             self.assertEqual(unsafe_in(out + err), [], fmt)
-            if fmt != "human":
+            if fmt in ("json", "sarif"):
                 for s in strings_of(json.loads(out)):
                     self.assertEqual(unsafe_in(s, allow_newline=False), [],
                                      (fmt, s))
@@ -426,7 +426,7 @@ class TestControlCharactersNeverReachTheTerminal(unittest.TestCase):
             outputs = run_all_formats("--config", p)
         for fmt, (code, out, err) in outputs.items():
             self.assertEqual(unsafe_in(out + err), [], fmt)
-            if fmt != "human":
+            if fmt in ("json", "sarif"):
                 for s in strings_of(json.loads(out)):
                     self.assertEqual(unsafe_in(s, allow_newline=False), [],
                                      (fmt, s))
@@ -448,7 +448,7 @@ class TestControlCharactersNeverReachTheTerminal(unittest.TestCase):
             outputs = run_all_formats()
         for fmt, (code, out, err) in outputs.items():
             self.assertEqual(unsafe_in(out + err), [], fmt)
-            self.assertIn("\\x1b[2J", out, fmt)
+            self.assertIn("\\x1b[2J", as_read(fmt, out), fmt)
 
     def test_errors_about_a_bad_config_argument(self):
         for name in ("missing" + ESC + "[2J" + RLO + ".json",):
@@ -470,7 +470,7 @@ class TestControlCharactersNeverReachTheTerminal(unittest.TestCase):
         self.assertIn("[!] skipped", human)
         for fmt, (code, out, err) in outputs.items():
             self.assertEqual(unsafe_in(out + err), [], fmt)
-            self.assertIn("\\x1b[2J", out + err, fmt)
+            self.assertIn("\\x1b[2J", as_read(fmt, out) + err, fmt)
 
     def test_warnings_about_unreadable_files(self):
         with isolated_machine() as (home, cwd):

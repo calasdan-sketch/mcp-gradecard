@@ -128,6 +128,23 @@ def run_cli(*argv, stdin_tty: bool = False, stdin_text: str = ""):
 
 
 def run_all_formats(*argv):
-    """The same audit in human, JSON and SARIF -> {format: (code, out, err)}."""
+    """The same audit in every format (human, JSON, SARIF, HTML, Markdown)
+    -> {format: (code, out, err)}."""
     return {fmt: run_cli(*argv, "--format", fmt)
-            for fmt in ("human", "json", "sarif")}
+            for fmt in ("human", "json", "sarif", "html", "markdown")}
+
+
+def as_read(fmt: str, out: str) -> str:
+    """A report as a reader sees it: the Markdown report escapes every
+    character that could start markup (`\\[`), the HTML one entity-encodes;
+    the other formats are as printed."""
+    if fmt == "markdown":
+        import re
+        # Markdown escapes only ASCII punctuation; `\x1b` in a code span
+        # is the text itself
+        return re.sub(r"\\([!-/:-@\[-`{-~])", r"\1", out).replace(
+            "&amp;", "&")
+    if fmt == "html":
+        import html
+        return html.unescape(out)
+    return out

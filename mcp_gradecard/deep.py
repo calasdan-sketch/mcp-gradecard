@@ -30,6 +30,7 @@ anything, and leaves out servers that have critical static findings unless
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import itertools
 import json
 import os
@@ -485,6 +486,7 @@ def _converse(proc, reader: _Reader, deadline: float, timeout: float) -> dict:
                 outputs = _parameters(tool.get("outputSchema"))
                 if outputs:
                     entry["outputs"] = outputs
+                entry["digest"] = tool_digest(tool)
                 tools.append(entry)
             else:  # not a tool object: still scan whatever it says
                 tools.append({"name": "", "description": _text(tool)})
@@ -495,6 +497,23 @@ def _converse(proc, reader: _Reader, deadline: float, timeout: float) -> dict:
         note = f"the tool list has more than {MAX_PAGES} pages; the rest " \
                "were not scanned"
     return {"ok": True, "tools": tools, "server": server, "error": note}
+
+
+def tool_digest(tool) -> str:
+    """SHA-256 of a tool definition exactly as the server sent it (every
+    field, schemas included, in a canonical JSON form): what --pins compares
+    between runs to catch a tool that changes under you. A definition that
+    cannot be put in canonical form (nested past Python's limits) is hashed
+    from its repr, which still changes when it does."""
+    try:
+        text = json.dumps(tool, sort_keys=True, ensure_ascii=False,
+                          separators=(",", ":"), default=str)
+    except (ValueError, TypeError, RecursionError):
+        try:
+            text = "repr:" + repr(tool)[:MAX_LINE_BYTES]
+        except RecursionError:
+            text = "unhashable"
+    return hashlib.sha256(text.encode("utf-8", "surrogatepass")).hexdigest()
 
 
 def _failure(error: str) -> dict:

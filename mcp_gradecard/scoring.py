@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 
-from . import discovery, redact
+from . import catalog, discovery, redact
 
 DEDUCTIONS = {"critical": 40, "high": 20, "medium": 10, "low": 5}
 
@@ -157,6 +157,47 @@ def render_human(results: list[dict], warnings: list[dict] | None = None,
     return redact.sanitize_report("\n".join(lines))
 
 
+def _sarif_rule(check: str) -> dict:
+    """A SARIF rule for one check id: its title, what to do, its OWASP MCP
+    Top 10 tags and the `security-severity` GitHub ranks by (raised to the
+    worst finding of the run)."""
+    refs = catalog.owasp(check)
+    rule = {"id": check, "name": check,
+            "shortDescription": {"text": catalog.title(check)},
+            "properties": {"tags": ["security", "mcp"]
+                           + [f"OWASP-{ref}" for ref in refs],
+                           "security-severity": "0.0"}}
+    fix = catalog.remediation(check)
+    if fix:
+        owasp = "; ".join(f"{ref} {catalog.OWASP[ref]}" for ref in refs)
+        rule["fullDescription"] = {"text": catalog.title(check)}
+        rule["help"] = {"text": fix + (f" (OWASP MCP Top 10: {owasp})"
+                                       if owasp else "")}
+        rule["helpUri"] = catalog.OWASP_URL if refs else (
+            "https://github.com/calasdan-sketch/mcp-gradecard")
+    return rule
+
+
+def _fingerprint(r: dict, f: dict) -> str:
+    """The same finding on the same server gets the same id on every run,
+    so code scanning can tell new alerts from old ones. Numbers in the
+    message are left out: a count ("3 tools changed", "+2 more") moves
+    while the alert is the same one."""
+    import hashlib
+    import json
+    import os
+    import re
+    try:
+        path = os.path.realpath(str(r.get("path")))
+    except (OSError, ValueError):
+        path = str(r.get("path"))
+    key = json.dumps([r.get("client"), path, r.get("project"),
+                      r.get("name"), f["check"],
+                      re.sub(r"[0-9]+", "#", f["message"])],
+                     ensure_ascii=False)
+    return hashlib.sha256(key.encode("utf-8", "surrogatepass")).hexdigest()
+
+
 _SARIF_LEVEL = {"critical": "error", "high": "error",
                 "medium": "warning", "low": "note"}
 
@@ -173,15 +214,20 @@ def render_sarif(results: list[dict], version: str) -> dict:
         except ValueError:
             uri = str(r["path"]).replace("\\", "/")
         for f in r["findings"]:
-            rules.setdefault(f["check"], {
-                "id": f["check"],
-                "shortDescription": {"text": f["check"]}})
+            rule = rules.setdefault(f["check"], _sarif_rule(f["check"]))
+            props = rule["properties"]
+            if float(catalog.security_severity(f["severity"])) > float(
+                    props["security-severity"]):
+                props["security-severity"] = catalog.security_severity(
+                    f["severity"])
             out.append({
                 "ruleId": f["check"],
                 "level": _SARIF_LEVEL.get(f["severity"], "note"),
                 "message": {"text": f"{r['name']}: {f['message']}"},
                 "locations": [{"physicalLocation": {
                     "artifactLocation": {"uri": uri}}}],
+                "partialFingerprints": {"mcpGradecard/v1": _fingerprint(
+                    r, f)},
                 "properties": {"severity": f["severity"],
                                "server": r["name"], "client": r["client"],
                                **({"project": r["project"]}
@@ -194,7 +240,7 @@ def render_sarif(results: list[dict], version: str) -> dict:
             "tool": {"driver": {
                 "name": "mcp-gradecard", "version": version,
                 "informationUri":
-                    "https://github.com/calasdan-sketch/mcp-audit",
+                    "https://github.com/calasdan-sketch/mcp-gradecard",
                 "rules": list(rules.values())}},
             "results": out,
         }],

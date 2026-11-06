@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-gradecard"
-version = "0.3.0"
+version = "0.4.0"
 description = "Security auditor for MCP server configurations."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -23,8 +23,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/calasdan-sketch/mcp-audit"
-Issues = "https://github.com/calasdan-sketch/mcp-audit/issues"
+Homepage = "https://github.com/calasdan-sketch/mcp-gradecard"
+Issues = "https://github.com/calasdan-sketch/mcp-gradecard/issues"
 
 [project.scripts]
 mcp-gradecard = "mcp_gradecard.cli:main"

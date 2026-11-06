@@ -42,7 +42,7 @@ _MAX_HOST = 120
 REDACTED = "[redacted]"
 
 #: Shapes of well-known credentials, redacted wherever they appear.
-_TOKEN_SHAPES_RE = re.compile("|".join((
+TOKEN_SHAPES_RE = _TOKEN_SHAPES_RE = re.compile("|".join((
     r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}",
     r"\bgithub_pat_[A-Za-z0-9_]{20,}",
     r"\bsk-[A-Za-z0-9_\-]{16,}",

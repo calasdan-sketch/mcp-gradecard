@@ -27,7 +27,8 @@ from mcp_gradecard import cli as cli_mod
 from mcp_gradecard import deep as deep_mod
 from mcp_gradecard import discovery
 
-from _support import FIX, isolated_machine, run_all_formats, run_cli, write_json
+from _support import (as_read, FIX, isolated_machine, run_all_formats,
+                      run_cli, write_json)
 
 POSIX = os.name == "posix"
 
@@ -572,7 +573,7 @@ class TestDeepInTheCli(unittest.TestCase):
             self.assertNotIn(esc, out + err, fmt)
             self.assertNotIn(chr(0x202E), out + err, fmt)
             self.assertNotIn(token, out + err, fmt)
-            self.assertIn("\\x1b[2J", out, fmt)
+            self.assertIn("\\x1b[2J", as_read(fmt, out), fmt)
 
 
 class TestProjectServersAreNotLaunched(unittest.TestCase):
