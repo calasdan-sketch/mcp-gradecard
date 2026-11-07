@@ -504,7 +504,7 @@ class TestTheHumanReportCannotBeSpoofed(unittest.TestCase):
             configs=[{"client": "c" + f, "path": "/p" + f, "servers": {}}])
         self.assertEqual([l for l in report.splitlines()
                           if l.lstrip().startswith("[A] fake-clean")], [])
-        self.assertEqual(report.count("fake-clean"), 10)  # shown, as text
+        self.assertEqual(report.count("fake-clean"), 12)  # shown, as text (two more: "Fix first")
         self.assertEqual(unsafe_in(report), [])
 
 

@@ -21,6 +21,7 @@
       "properties": {
         "servers": {"type": "integer", "minimum": 0},
         "findings": {"type": "integer", "minimum": 0},
+        "overall_grade": {"enum": ["A", "B", "C", "D", "F", "?"], "description": "The lowest grade of any server; ? when no server was audited. Added in 0.5.0."},
         "by_severity": {
           "type": "object",
           "required": ["critical", "high", "medium", "low"],

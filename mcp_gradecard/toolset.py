@@ -24,7 +24,7 @@ import os
 import re
 import tempfile
 
-from . import redact
+from . import _fsutil, redact
 
 PINS_VERSION = 1
 #: A pins file larger than this is not read (a real one is a few kilobytes
@@ -181,7 +181,7 @@ def save(path: str, servers: "dict[str, dict]", labels: "dict[str, dict]"
             f.write(blob + b"\n")
             f.flush()
             os.fsync(f.fileno())
-        os.replace(tmp, path)
+        _fsutil.replace(tmp, path)
     except BaseException:
         try:
             os.unlink(tmp)

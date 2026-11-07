@@ -20,29 +20,66 @@ Thousands of one-line-install MCP servers, ~zero vetting. This is the vetting.
 ### Quick start
 
 ```bash
-pip install git+https://github.com/calasdan-sketch/mcp-gradecard
-mcp-gradecard                                   # terminal report
-mcp-gradecard --format html > mcp-report.html   # a report to read or share
+pip install mcp-gradecard
+mcp-gradecard --demo                            # see a report first, on a built-in sample
+mcp-gradecard                                   # audit this machine (reads config files, launches nothing)
+mcp-gradecard --advice                          # ... with what to do about each finding
+mcp-gradecard --format html -o report.html      # a report to read or hand to someone
 ```
 
-A finished report for a small demo config is in
+`pipx run mcp-gradecard --demo` and `uvx mcp-gradecard --demo` run it without
+installing. Python 3.10 or newer, no other dependencies.
+
+> **Release note (2026-11-07).** PyPI holds 0.3.0; everything below describes
+> 0.5.0, which is not published yet. Until it is, install the newest code with
+> `pip install git+https://github.com/calasdan-sketch/mcp-gradecard`.
+> (Delete this note when 0.5.0 is on PyPI.)
+
+If you have no MCP servers yet, or want to see the output before pointing the
+tool at your own files, `--demo` audits a small invented config (four
+servers, one problem of each common kind). It reads nothing from your machine
+and launches nothing.
+
+A finished report for the same demo config is in
 [`examples/demo-report.html`](examples/demo-report.html) (and
 [`.md`](examples/demo-report.md)); the config it audits is
-[`examples/demo-mcp.json`](examples/demo-mcp.json). The terminal version:
+[`examples/demo-mcp.json`](examples/demo-mcp.json). The terminal version
+(`mcp-gradecard --demo`, shortened):
 
 ```text
-  [F] quick-setup  (0/100)  <explicit>
+  [F] quick-setup  (0/100)  <demo>
+        (built-in demo - not your machine)
         [CRITICAL] server runs 'curl' inside 'bash' — a downloader/shell, not a server binary
         [CRITICAL] command pipes content into a shell (classic curl|sh pattern)
-  [D] vendor-crm  (50/100)  <explicit>
+        ...
+  [D] vendor-crm  (50/100)  <demo>
         [HIGH    ] remote MCP server in 'url' is reached over plain http:// (no TLS): ...
         [HIGH    ] credential written into a URL in 'url' (api_key): ...
-  [B] github  (75/100)  <explicit>
+  [B] github  (75/100)  <demo>
         [MEDIUM  ] unpinned package '@modelcontextprotocol/server-github' — ...
-        [LOW     ] credential stored in plain text in the config file: env GITHUB_PERSONAL_ACCESS_TOKEN — ...
-  [A] filesystem  (100/100)  <explicit>
+  [A] filesystem  (100/100)  <demo>
         ✓ no findings
+
+  4 servers · 9 findings (crit=3 high=2 med=3 low=1)
+
+  Overall: F  —  3 critical finding(s): act on these before you use these servers again.
+  Fix first:
+    1. quick-setup [F]: server runs 'curl' inside 'bash'  (+2 more serious)
+    2. vendor-crm [D]: remote MCP server in 'url' is reached over plain http://  (+1 more serious)
+  Next:
+    mcp-gradecard --advice                      what to do about each finding
+    mcp-gradecard --format html -o report.html  a report you can hand over
+    mcp-gradecard --deep                        also read what servers say about their tools (launches them)
 ```
+
+On a terminal the grades and severities are coloured (`--color never`, or the
+`NO_COLOR` variable, turns that off). Use `-o FILE` rather than `> FILE` to
+save a report: it writes UTF-8 whatever the shell does (PowerShell's `>`
+writes UTF-16), replaces the file in one step, and exits 2 in plain words if it
+cannot write.
+
+Exit codes: `0` the run finished, `1` a `--fail-on` threshold was met, `2` the
+audit could not be completed, `128+N` stopped by signal N.
 
 ### How it compares
 
@@ -78,7 +115,7 @@ and Semgrep rules. mcp-gradecard reads configs and live tool lists only.
 Zero dependencies — Python 3.10+ stdlib only.
 
 ```bash
-pip install git+https://github.com/calasdan-sketch/mcp-gradecard
+pip install mcp-gradecard             # see the release note under Quick start
 mcp-gradecard                         # auto-discovers installed clients
 ```
 
@@ -157,6 +194,11 @@ python3 -m mcp_gradecard --format cyclonedx > mcp-bom.json
 # Say what to do under every finding, or explain one check
 python3 -m mcp_gradecard --advice
 python3 -m mcp_gradecard --explain floating-version
+
+# See a report on a built-in sample (reads and launches nothing), or save a
+# report as UTF-8 with -o (use it instead of `>`, which PowerShell writes as UTF-16)
+python3 -m mcp_gradecard --demo
+python3 -m mcp_gradecard --format html -o report.html
 
 # Print the version and stop
 python3 -m mcp_gradecard --version

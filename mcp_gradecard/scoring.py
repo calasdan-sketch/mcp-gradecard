@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 import textwrap
 
@@ -78,6 +79,93 @@ def _deep_line(r: dict) -> "str | None":
             "safety)")
 
 
+
+_FIRST = 3          # findings under "Fix first" in the terminal report
+_FIRST_WIDTH = 104
+
+
+def _verdict_block(results: list[dict], warnings: list[dict], n_configs: int,
+                   advice: bool, deep: bool) -> list[str]:
+    """The end of the terminal report: the overall grade in one sentence, the
+    few findings to fix first, and the next commands worth knowing. What a
+    person reads last is what they act on."""
+    from . import report     # report imports this module
+    s = redact.sanitize
+    overall = report._worst_grade(results)
+    sentence = report._verdict(results, warnings, n_configs)
+    serious = [f for r in results for f in r["findings"]
+               if f["severity"] in ("critical", "high")]
+    if serious and all(f.get("known") for f in serious):
+        sentence = ("Nothing new: every critical or high finding is already "
+                    "in the baseline.")
+    out = ["", f"  Overall: {overall}  {sym('—')}  {sentence}"]
+    worst: list[tuple[dict, list[dict]]] = []
+    for r in sorted(results, key=lambda x: (x["score"], str(x["name"]))):
+        hot = sorted((f for f in r["findings"]
+                      if not f.get("known")
+                      and f["severity"] in ("critical", "high")),
+                     key=lambda f: _SEV_ORDER.get(f["severity"], 9))
+        if hot:
+            worst.append((r, hot))
+    if worst:
+        out.append("  Fix first:")
+        for i, (r, hot) in enumerate(worst[:_FIRST], 1):
+            head = hot[0]["message"].split(" \u2014 ")[0]
+            if len(head.split(": ")[0]) >= 25:
+                head = head.split(": ")[0]
+            if len(head) > _FIRST_WIDTH:
+                head = head[:_FIRST_WIDTH - 3].rstrip() + "..."
+            more = (f"  (+{len(hot) - 1} more serious)" if len(hot) > 1
+                    else "")
+            out.append(f"    {i}. {s(str(r['name']))} [{r['grade']}]: "
+                       f"{s(head)}{more}")
+        if len(worst) > _FIRST:
+            out.append(f"    (and {len(worst) - _FIRST} more server(s) with "
+                       "critical or high findings)")
+    nxt = []
+    if not advice and any(r["findings"] for r in results):
+        nxt.append(("--advice", "what to do about each finding"))
+    nxt.append(("--format html -o report.html", "a report you can hand over"))
+    if not deep:
+        nxt.append(("--deep", "also read what servers say about their "
+                              "tools (launches them)"))
+    out.append("  Next:")
+    for cmd, what in nxt:
+        out.append(("    " + ("mcp-gradecard " + cmd if cmd else "").ljust(44)
+                    + what).rstrip())
+    return out
+
+
+# ANSI colour for the terminal report. Untrusted text reaches the report with
+# its escape characters spelled out, so an escape sequence here is ours.
+_RESET = "\x1b[0m"
+_GRADE_COLOUR = {"A": "32", "B": "32", "C": "33", "D": "31", "F": "1;31",
+                 "?": "90"}
+_SEV_COLOUR = {"CRITICAL": "1;31", "HIGH    ": "31", "MEDIUM  ": "33",
+               "LOW     ": "36"}
+_GRADE_LINE = re.compile(r"^(  )\[([A-F?])\](?= \S)", re.M)
+_SEV_LINE = re.compile(r"^(        )\[(CRITICAL|HIGH    |MEDIUM  |LOW     )\]",
+                       re.M)
+_OVERALL_LINE = re.compile(r"^(  Overall: )([A-F?])(?=  )", re.M)
+
+
+def colorize(text: str) -> str:
+    """Add ANSI colour to the grade letters and severity tags of a finished
+    terminal report."""
+    def grade(m):
+        return f"{m.group(1)}[\x1b[{_GRADE_COLOUR[m.group(2)]}m{m.group(2)}{_RESET}]"
+
+    def sev(m):
+        return (f"{m.group(1)}[\x1b[{_SEV_COLOUR[m.group(2)]}m{m.group(2)}"
+                f"{_RESET}]")
+
+    def overall(m):
+        return f"{m.group(1)}\x1b[{_GRADE_COLOUR[m.group(2)]}m{m.group(2)}{_RESET}"
+    text = _GRADE_LINE.sub(grade, text)
+    text = _SEV_LINE.sub(sev, text)
+    return _OVERALL_LINE.sub(overall, text)
+
+
 def render_human(results: list[dict], warnings: list[dict] | None = None,
                  n_configs: int = 0, configs: list[dict] | None = None,
                  advice: bool = False, policy: "dict | None" = None,
@@ -128,6 +216,15 @@ def render_human(results: list[dict], warnings: list[dict] | None = None,
         if n_configs == 0:
             lines.append(f"  [mcp-gradecard] warning: no MCP configs discovered "
                          f"{sym('—')} this is not a clean bill of health.")
+            lines += ["",
+                      "  It looked in the usual places for Claude Code, Claude "
+                      "Desktop, Cursor, VS Code,",
+                      "  Windsurf, Zed and other clients, and found no MCP "
+                      "servers.",
+                      "",
+                      "  To see what a report looks like:   mcp-gradecard --demo",
+                      "  To check one file you know about:  mcp-gradecard "
+                      "--config FILE"]
         else:
             lines.append("  no MCP servers found in audited configs.")
         lines.append(rule * 50)
@@ -160,11 +257,14 @@ def render_human(results: list[dict], warnings: list[dict] | None = None,
             lines.append(f"        {deep}")
         elif not r["findings"]:
             lines.append(f"        {sym('✓')} no findings")
-    s = summarize(results)
+    total = summarize(results)
+    sev = total["by_severity"]
     lines += ["",
-              f"  {s['servers']} servers {sym('·')} {s['findings']} findings "
-              f"(crit={s['by_severity']['critical']} high={s['by_severity']['high']} "
-              f"med={s['by_severity']['medium']} low={s['by_severity']['low']})"]
+              f"  {total['servers']} server{'' if total['servers'] == 1 else 's'} "
+              f"{sym('·')} {total['findings']} "
+              f"finding{'' if total['findings'] == 1 else 's'} "
+              f"(crit={sev['critical']} high={sev['high']} "
+              f"med={sev['medium']} low={sev['low']})"]
     if policy:
         bits = []
         if policy.get("baseline"):
@@ -199,6 +299,8 @@ def render_human(results: list[dict], warnings: list[dict] | None = None,
         lines.append(f"  [mcp-gradecard] warning: {len(warnings)} config file(s) "
                      f"existed but were not audited {sym('—')} results are "
                      "not a clean bill of health.")
+    lines += _verdict_block(results, warnings, n_configs, advice, deep=any(
+        r.get("deep_read") is not None for r in results))
     lines.append(rule * 50)
     return redact.sanitize_report("\n".join(lines))
 

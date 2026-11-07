@@ -29,6 +29,8 @@ import os
 import re
 import tempfile
 
+from . import _fsutil
+
 SCHEMA = 1
 MAX_FILE = 4_000_000
 MAX_ENTRIES = 5000
@@ -148,7 +150,7 @@ def write_baseline(path: str, results: list, version: str) -> int:
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
-        os.replace(tmp, path)
+        _fsutil.replace(tmp, path)
     except BaseException:
         try:
             os.unlink(tmp)

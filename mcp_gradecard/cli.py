@@ -16,7 +16,9 @@ import time
 import traceback
 
 from . import __version__
+from . import _fsutil
 from . import deep as deep_mod
+from . import demo as demo_mod
 from . import baseline as baseline_mod
 from . import compare as compare_mod
 from . import catalog
@@ -502,7 +504,7 @@ def _write_atomic(path: str, data: bytes) -> None:
             shutil.copymode(path, tmp)
         except OSError:
             pass
-        os.replace(tmp, path)
+        _fsutil.replace(tmp, path)
     except BaseException:
         try:
             os.unlink(tmp)
@@ -648,12 +650,32 @@ def _host_arg(text: str) -> str:
         raise argparse.ArgumentTypeError(str(e)) from None
 
 
+_EPILOG = """\
+first run:
+  mcp-gradecard --demo                      see a report on a built-in sample
+  mcp-gradecard                             audit the MCP servers on this machine
+  mcp-gradecard --advice                    ... with what to do about each finding
+  mcp-gradecard --format html -o report.html   a report to read or hand over
+
+exit codes:
+  0  the run finished (and no --fail-on threshold was met)
+  1  --fail-on: a finding at or above that severity
+  2  the audit could not be completed: an unreadable --config, a broken
+     policy file, a config that could not be audited under --fail-on, ...
+  128+N  stopped by signal N (130 = Ctrl-C)
+
+Nothing is sent anywhere unless you give --online. --deep launches servers
+(it lists them first). Docs: https://github.com/calasdan-sketch/mcp-gradecard
+"""
+
+
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="mcp-gradecard",
         description="Audit installed MCP servers: prompt-injection, "
                     "exfiltration endpoints, known-vulnerable versions, "
-                    "floating pins, secret env vars.")
+                    "floating pins, secret env vars.",
+        epilog=_EPILOG, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--config", action="append", default=None,
                    help="Explicit config file to audit (repeatable). "
                         "Default: auto-discover Claude Code (+project "
@@ -734,6 +756,20 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--prepared-by", metavar="TEXT", default=None,
                    help="With --format html or markdown: who prepared the "
                         "report (a name or a company), shown on its cover.")
+    p.add_argument("-o", "--output", metavar="FILE", default=None,
+                   help="Write the report to FILE (UTF-8) instead of "
+                        "printing it. Safer than `> file` on Windows, where "
+                        "PowerShell writes UTF-16. An existing FILE is "
+                        "replaced; a failure exits 2.")
+    p.add_argument("--demo", action="store_true",
+                   help="Audit a small built-in sample config instead of "
+                        "this machine, to see what a report looks like. "
+                        "Reads and launches nothing.")
+    p.add_argument("--color", choices=("auto", "always", "never"),
+                   default="auto",
+                   help="Colour the grades and severities of the terminal "
+                        "report. auto: only on a terminal, never when "
+                        "NO_COLOR is set.")
     p.add_argument("--advice", action="store_true",
                    help="Under each finding of the terminal report, say what "
                         "to do about it.")
@@ -820,7 +856,9 @@ def _json_report(results: list, warnings: list, policy: dict,
         rows.append(row)
     doc = {"schema_version": 1,
            "tool": {"name": "mcp-gradecard", "version": __version__},
-           "results": rows, "summary": scoring.summarize(results),
+           "results": rows,
+           "summary": {**scoring.summarize(results),
+                       "overall_grade": report._worst_grade(results)},
            "policy": policy, "warnings": warnings,
            "scan": {"deep": bool(deep)}}
     if comparison is not None:
@@ -1039,6 +1077,64 @@ def main(argv: list[str] | None = None) -> int:
             return _crash(e)
 
 
+def _demo_discovery() -> "tuple[list[dict], list[dict]]":
+    """The built-in sample, read back through the ordinary discovery path so
+    that it is judged exactly as a real file would be."""
+    with tempfile.TemporaryDirectory(prefix="mcp-gradecard-demo-") as folder:
+        path = os.path.join(folder, "demo-mcp.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(demo_mod.config(), f)
+        found, warnings = discovery.discover([path])
+    for group in found:
+        group["path"] = demo_mod.LABEL
+        group["client"] = "demo"
+    for w in warnings:
+        w["path"] = demo_mod.LABEL
+    return found, warnings
+
+
+def _input_file_named(output: str, discovered: list, args) -> "str | None":
+    """Say which input `-o` points at, if any: `-o ~/.claude.json` must never
+    turn a client's config into a report."""
+    def same(path) -> bool:
+        try:
+            return os.path.samefile(output, path)
+        except (OSError, ValueError):
+            return False
+    for group in discovered:
+        if same(group["path"]):
+            return "a config file that was audited"
+    for flag, value in (("--tools-json", args.tools_json),
+                        ("--baseline", args.baseline),
+                        ("--write-baseline", args.write_baseline),
+                        ("--suppressions", args.suppressions),
+                        ("--compare", args.compare), ("--pins", args.pins)):
+        for path in ([value] if isinstance(value, str) else value or []):
+            if same(path):
+                return f"the file named by {flag}"
+    return None
+
+
+def _wants_colour(mode: str) -> bool:
+    """Colour on a terminal that can show it, never against NO_COLOR."""
+    if mode == "never":
+        return False
+    if mode == "always":
+        return True
+    if os.environ.get("NO_COLOR") or os.environ.get("TERM") == "dumb":
+        return False
+    try:
+        if not sys.stdout.isatty():
+            return False
+    except (AttributeError, ValueError):
+        return False
+    if os.name == "nt":    # old consoles print the codes as text
+        return any(os.environ.get(k) for k in ("WT_SESSION", "ANSICON",
+                                               "ConEmuANSI", "TERM",
+                                               "TERM_PROGRAM"))
+    return True
+
+
 def _main(argv: list[str] | None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -1065,6 +1161,21 @@ def _main(argv: list[str] | None) -> int:
                                                             "markdown"):
         parser.error("--prepared-by only works with --format html or "
                      "markdown")
+    if args.demo:
+        for flag, used in (("--config", args.config),
+                           ("--tools-json", args.tools_json),
+                           ("--deep", args.deep), ("--fix", args.fix),
+                           ("--pins", args.pins), ("--online", args.online),
+                           ("--baseline", args.baseline),
+                           ("--write-baseline", args.write_baseline),
+                           ("--compare", args.compare),
+                           ("--suppressions", args.suppressions)):
+            if used:
+                parser.error(f"--demo audits a built-in sample, so it "
+                             f"cannot be combined with {flag}")
+        if args.report_title is None and args.format in ("html", "markdown",
+                                                         "cyclonedx"):
+            args.report_title = demo_mod.TITLE
     if args.explain is not None:
         return _explain(args.explain)
     try:
@@ -1096,7 +1207,11 @@ def _main(argv: list[str] | None) -> int:
             if err is not None:
                 _note(f"error: cannot read --config file '{path}': {err}")
                 return 2
-    if args.tools_json and not args.config:
+    if args.demo:
+        discovered, warnings = _demo_discovery()
+        _note("--demo: this is a built-in sample, not your machine; nothing "
+              "was read or launched")
+    elif args.tools_json and not args.config:
         discovered, warnings = [], []
     else:
         discovered, warnings = discovery.discover(args.config)
@@ -1149,41 +1264,58 @@ def _main(argv: list[str] | None) -> int:
     # Names, paths and project directories come from the config files: what
     # is printed has its control and bidi characters spelled out (sanitize),
     # whatever the format.
+    deep_used = args.deep or bool(tool_results)
     if args.format == "sarif":
-        print(json.dumps(redact.sanitize_tree(
+        text = json.dumps(redact.sanitize_tree(
             scoring.render_sarif(results, __version__,
-                                 baseline=known is not None)), indent=2))
+                                 baseline=known is not None)), indent=2)
     elif args.format == "cyclonedx":
-        print(json.dumps(redact.sanitize_tree(
+        text = json.dumps(redact.sanitize_tree(
             supply.render_cyclonedx(results, __version__,
-                                    args.report_title)), indent=2))
+                                    args.report_title)), indent=2)
     elif args.format in ("html", "markdown"):
         render = (report.render_html if args.format == "html"
                   else report.render_markdown)
-        print(render(results, warnings=warnings, configs=discovered,
-                     version=__version__, title=args.report_title,
-                     deep=args.deep or bool(tool_results),
-                     prepared_by=args.prepared_by, policy=policy,
-                     comparison=comparison))
+        text = render(results, warnings=warnings, configs=discovered,
+                      version=__version__, title=args.report_title,
+                      deep=deep_used, prepared_by=args.prepared_by,
+                      policy=policy, comparison=comparison)
     elif args.format == "json":
-        print(json.dumps(redact.sanitize_tree(
-            _json_report(results, warnings, policy,
-                         args.deep or bool(tool_results), comparison)),
-            indent=2))
+        text = json.dumps(redact.sanitize_tree(
+            _json_report(results, warnings, policy, deep_used, comparison)),
+            indent=2)
+    else:
+        text = scoring.render_human(
+            results, warnings=warnings,
+            n_configs=len(discovered) + len(args.tools_json or ()),
+            configs=discovered, advice=args.advice, policy=policy,
+            comparison=comparison)
+        if not args.output and _wants_colour(args.color):
+            text = scoring.colorize(text)
     if args.format != "human":
         if args.format in ("sarif", "cyclonedx"):
             for w in warnings:  # JSON carries these inline; SARIF can't
                 _note(f"warning: skipped {w['path']} <{w['client']}>: "
                       f"{w['reason']}")
         if not discovered and not tool_results:
-            _note("warning: no MCP configs discovered — this is not a "
+            _note("warning: no MCP configs discovered \u2014 this is not a "
                   "clean bill of health")
+    if args.output:
+        clash = _input_file_named(args.output, discovered, args)
+        if clash:
+            _note(f"error: --output '{args.output}' is {clash}; refusing to "
+                  "replace a file the audit reads with its report")
+            return 2
+        try:
+            _fsutil.write_text_atomic(args.output, text + "\n")
+        except OSError as e:
+            _note(f"error: cannot write --output '{args.output}': "
+                  f"{e.strerror or type(e).__name__}")
+            return 2
+        _note(f"wrote the {args.format} report to {args.output}"
+              + (" - open it in a browser" if args.format == "html" else ""))
     else:
-        print(scoring.render_human(results, warnings=warnings,
-                                   n_configs=len(discovered) + len(
-                                       args.tools_json or ()),
-                                   configs=discovered, advice=args.advice,
-                                   policy=policy, comparison=comparison))
+        print(text)
 
     if args.write_baseline:
         if warnings or fix_failed:
