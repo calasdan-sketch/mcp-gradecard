@@ -507,8 +507,11 @@ class TestBenchmark(unittest.TestCase):
         import re
         for url in (u.rstrip(".") for u in re.findall(
                 r"https?://([A-Za-z0-9.-]+)", text)):
+            documentation_net = re.fullmatch(
+                r"(?:192\.0\.2|198\.51\.100|203\.0\.113)\.\d{1,3}", url)  # RFC 5737
             self.assertTrue(url.endswith(".example") or url == "attacker.example"
-                            or url.endswith(".attacker.example"), url)
+                            or url.endswith(".attacker.example")
+                            or documentation_net, url)
         self.assertNotRegex(text, r"(?:sk|ghp|xox[bp])[-_][A-Za-z0-9]{16,}")
 
     def test_quality_floors(self):

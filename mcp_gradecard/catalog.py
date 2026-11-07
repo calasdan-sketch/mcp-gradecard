@@ -134,6 +134,17 @@ CHECKS: "dict[str, tuple[str, tuple[str, ...], str]]" = {
         "Weakened container isolation",
         ("MCP02",),
         "Remove the option unless the server documents why it needs it."),
+    "launch-env": (
+        "Environment variable that changes what the server loads or trusts",
+        ("MCP05", "MCP04"),
+        "Remove the variable unless you wrote it and know why the server "
+        "needs it; never point a preload, a loader or a certificate "
+        "variable at a file you did not review."),
+    "elevated-launch": (
+        "Server started with elevated rights",
+        ("MCP02", "MCP05"),
+        "Run the server as your own user. A server that needs root for one "
+        "task should get that task through a narrow, reviewed helper."),
     "invalid-config": (
         "Server entry that cannot be analyzed",
         ("MCP08",),

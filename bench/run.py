@@ -127,7 +127,7 @@ def cisco(entries):
 
 def split_summary(rows):
     return {name: summary([r for r in rows if r["split"] == name])
-            for name in ("dev", "holdout")}
+            for name in ("dev", "holdout", "r3")}
 
 
 def main():
@@ -159,17 +159,18 @@ def main():
         show(summary(crow))
         # Cisco's analyzer reads one tool at a time: no pins, no other servers.
         text = {"rug-pull", "rug-pull-control", "shadowing"}
-        print("\nText classes only (no rug-pull, no shadowing), dev and holdout together:")
+        print("\nText classes only (no rug-pull, no shadowing), all splits together:")
         for name, rs in (("mcp-gradecard", rows), ("Cisco YARA", crow)):
             r = rates([x for x in rs if x["class"] not in text], "flagged")
             print("  %-14s precision %.3f recall %.3f false-positive rate %.3f"
                   % (name, r["precision"], r["recall"], r["false_positive_rate"]))
-        print("Holdout only:")
-        for name, rs in (("mcp-gradecard", rows), ("Cisco YARA", crow)):
-            r = rates([x for x in rs if x["class"] not in text
-                       and e_split[x["id"]] == "holdout"], "flagged")
-            print("  %-14s precision %.3f recall %.3f false-positive rate %.3f"
-                  % (name, r["precision"], r["recall"], r["false_positive_rate"]))
+        for split in ("holdout", "r3"):
+            print("%s only:" % split.capitalize())
+            for name, rs in (("mcp-gradecard", rows), ("Cisco YARA", crow)):
+                r = rates([x for x in rs if x["class"] not in text
+                           and e_split[x["id"]] == split], "flagged")
+                print("  %-14s precision %.3f recall %.3f false-positive rate %.3f"
+                      % (name, r["precision"], r["recall"], r["false_positive_rate"]))
     if a.write:
         with open(os.path.join(HERE, "results.json"), "w", encoding="utf-8", newline="\n") as f:
             json.dump(s, f, indent=1, sort_keys=True)

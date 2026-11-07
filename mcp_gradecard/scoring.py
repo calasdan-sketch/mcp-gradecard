@@ -80,7 +80,8 @@ def _deep_line(r: dict) -> "str | None":
 
 def render_human(results: list[dict], warnings: list[dict] | None = None,
                  n_configs: int = 0, configs: list[dict] | None = None,
-                 advice: bool = False, policy: "dict | None" = None) -> str:
+                 advice: bool = False, policy: "dict | None" = None,
+                 comparison: "dict | None" = None) -> str:
     """Render the human report.
 
     warnings: discovery warnings for config files that existed but were
@@ -177,6 +178,23 @@ def render_human(results: list[dict], warnings: list[dict] | None = None,
             lines.append(f"  [!] a suppression of '{s(str(e['check']))}' "
                          f"expired on {s(str(e['expires']))}: the finding "
                          "counts again")
+    if comparison:
+        from . import compare as compare_mod
+        lines += ["", f"  Since the previous check: "
+                      f"{redact.sanitize(compare_mod.summary_line(comparison))}"]
+        for item in comparison["resolved"][:30]:
+            lines.append(f"    [resolved] {redact.sanitize(item['severity']).upper()} "
+                         f"{redact.sanitize(item['server'])}: {redact.sanitize(item['title'])}"
+                         + (" (server removed)" if item["server_removed"]
+                            else ""))
+        for item in comparison["new"][:30]:
+            lines.append(f"    [new]      {redact.sanitize(item['severity']).upper()} "
+                         f"{redact.sanitize(item['server'])}: {redact.sanitize(item['title'])}")
+        for m in comparison["grade_changes"][:30]:
+            lines.append(f"    [grade]    {redact.sanitize(m['server'])}: {m['before']} -> "
+                         f"{m['after']}")
+        if comparison.get("note"):
+            lines.append(f"    note: {redact.sanitize(comparison['note'])}")
     if warnings:
         lines.append(f"  [mcp-gradecard] warning: {len(warnings)} config file(s) "
                      f"existed but were not audited {sym('—')} results are "

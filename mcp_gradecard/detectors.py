@@ -10,7 +10,7 @@ import urllib.request
 from importlib import resources
 from typing import NamedTuple
 
-from . import redact, supply, urls
+from . import launchenv, redact, supply, urls
 
 #: The advisory feed, shipped as package data next to this module.
 FEED_NAME = "advisories.json"
@@ -1968,6 +1968,7 @@ STATIC_DETECTORS = (
     detect_transport,
     detect_container_escape,
     supply.detect_typosquat,
+    launchenv.detect_launch_env,
 )
 
 
@@ -1984,6 +1985,7 @@ DETECTOR_SUBJECT = {
     "detect_transport": "how a remote server is reached",
     "detect_container_escape": "container options",
     "detect_typosquat": "look-alike package names",
+    "detect_launch_env": "how the server is started (environment, sudo)",
 }
 
 

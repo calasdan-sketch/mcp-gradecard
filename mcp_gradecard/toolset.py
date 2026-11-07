@@ -247,6 +247,10 @@ _TOKEN_RE = re.compile(r"[A-Za-z0-9_\-]{4,64}")
 MAX_SHADOW_TEXT = 2_000_000
 
 
+def _canon(name: str) -> str:
+    return name.lower().replace("-", "_")
+
+
 def _distinctive(name: str) -> bool:
     """A tool name specific enough that mentioning it means that tool:
     snake_case, kebab-case or camelCase and at least six characters.
@@ -307,6 +311,11 @@ def _shadowing(probed: list[dict]) -> "dict[int, list[dict]]":
         for name in {str(t.get("name") or "") for t in r.get("tools") or []}:
             if name:
                 owners.setdefault(name, []).append(r)
+    # "Send-Email" names the tool "send_email": case and separators do not
+    # make a different tool in a sentence.
+    _spelled = {}
+    for name in owners:
+        _spelled.setdefault(_canon(name), name)
     out: "dict[int, list[dict]]" = {}
     for r in probed:
         mine = {str(t.get("name") or "") for t in r.get("tools") or []}
@@ -334,10 +343,13 @@ def _shadowing(probed: list[dict]) -> "dict[int, list[dict]]":
             text = text[:MAX_SHADOW_TEXT - spent]
             spent += len(text)
             for token in set(_TOKEN_RE.findall(text)):
-                if token in mine or token not in owners \
-                        or not _distinctive(token):
+                if token in mine or not _distinctive(token):
                     continue
-                others = [o for o in owners[token]
+                key = token if token in owners else _spelled.get(
+                    _canon(token))
+                if key is None or key in mine:
+                    continue
+                others = [o for o in owners[key]
                           if o.get("config") != r.get("config")]
                 if others:
                     mentioned.setdefault(token, set()).update(

@@ -132,6 +132,15 @@ python3 -m mcp_gradecard --online
 python3 -m mcp_gradecard --config .mcp.json --write-baseline .mcp-gradecard-baseline.json
 python3 -m mcp_gradecard --config .mcp.json --baseline .mcp-gradecard-baseline.json --fail-on high
 
+# Before and after: set this run against an earlier --format json report (or a
+# --write-baseline file): what is resolved, still open and new, and how each
+# server's grade moved. Shown in the terminal, JSON, HTML and Markdown.
+python3 -m mcp_gradecard --format json > before.json     # first check
+python3 -m mcp_gradecard --compare before.json --format html > after.html
+
+# In CI an empty audit is not a pass: exit 2 when no server was audited
+python3 -m mcp_gradecard --fail-on high --require-servers
+
 # Accept a finding for a while, with a reason and an expiry date (both
 # required); it leaves the grade and the gate, stays in the report, and
 # counts again after the date. Never read unless named.
@@ -327,6 +336,8 @@ Weekly cron example (uses the installed console script):
 | `secret-header` | medium | A remote server's `headers` carry a credential as a literal value (`Authorization: Bearer sk-...`, `X-API-Key`, or a header named like a `secret-env` variable), so the file holds it in plain text. A reference (`Bearer ${GITHUB_TOKEN}`, `$VAR`, `%VAR%`, `${input:id}`, `{env:VAR}`) is the safe form and is not flagged. Only the header names are printed, never a value |
 | `container-escape` | high | A `docker`, `podman` or `nerdctl` `run` that removes the container's isolation: `--privileged`, `--cap-add` of `ALL`, `SYS_ADMIN`, `SYS_MODULE`, `SYS_PTRACE`, `SYS_RAWIO` or `DAC_READ_SEARCH`, a mount of the whole host file system (`-v /:/host`, `C:\`), or a mount of the engine's socket (`docker.sock`). Only the options before the image are read; an ordinary folder mount or published port is not flagged |
 | `container-isolation` | medium | The same commands with `--network host` (or `--pid`, `--ipc`, `--userns`, `--uts host`), or a `--security-opt` that is `unconfined`. A value in a form mcp-gradecard does not read (an option it has no table entry for ahead of the image) can hide one of these: it is a list, and what is not on it is not seen |
+| `launch-env` | high / medium / low | An `env` entry that changes what the server loads or trusts. High: `LD_PRELOAD`, `LD_AUDIT`, `DYLD_INSERT_LIBRARIES`, `BASH_ENV`, `PERL5OPT`, `RUBYOPT`, `PYTHONSTARTUP` (code runs before the server), `NODE_OPTIONS` with `--require`, `-r`, `--import`, `--loader`, `--eval` or `--inspect`, a Java option variable with `-javaagent`, `-agentlib` or `-agentpath`, and a switch that turns certificate checking off (`NODE_TLS_REJECT_UNAUTHORIZED=0`, `PYTHONHTTPSVERIFY=0`, `GIT_SSL_NO_VERIFY`). Medium: a variable that changes which certificates are trusted (`SSL_CERT_FILE`, `NODE_EXTRA_CA_CERTS`, `REQUESTS_CA_BUNDLE`) or sends traffic through a proxy that is not on this machine. Low: a library search path (`PYTHONPATH`, `NODE_PATH`, `CLASSPATH`). Only the variable's name (and the flag names) is shown, never its value |
+| `elevated-launch` | high | The server is started through `sudo`, `doas`, `pkexec`, `gsudo` (also inside `sh -c "..."`), so it runs with more rights than the agent that uses it |
 | `remote-server` | medium | A non-local MCP server: a `url` or `serverUrl` entry, or the address given to a bridge - `mcp-remote`, `mcp-proxy` or `supergateway`, also started through `npx`, `bunx`, `pnpm dlx`, `uvx`, `cmd /c` or `bash -lc` - so traffic leaves the machine by design, as with a `url` entry. A bridge has one server: the URL after `--sse`, `--streamableHttp`, `--url` or `--remote`, or else the first URL it is given; any other URL is an endpoint. Not reported: a local server, or one named with `--allow-host` (https and wss only) |
 | `unparseable-url` | high | A URL in the config that cannot be taken apart (`http://[x`), or whose host depends on the parser that reads it (`https://evil.example\@api.github.com/`: Python says api.github.com, Node says evil.example): where it points is unknown, so it is treated as unsafe. The second kind comes with the remote endpoint it can point to. One bad URL never hides another |
 | `detector-error` | high | A check crashed on this entry, or could not read all of it (a command line over 1,000,000 characters or nested too deeply, a script with more than 2,000 different URLs). mcp-gradecard fails closed: this is a visible HIGH finding (so `--fail-on high` trips), never a quiet pass. Only the exception class is shown |
@@ -785,6 +796,20 @@ file. `known` and the counts of new, known and fixed findings are in the JSON
 audit a config file refuses to write a baseline (exit 2), so a baseline never
 hides what was not read. The id contains the client, the server name, the
 check and the message with its numbers taken out; it does not contain a path.
+
+**Before and after (`--compare`).** `--compare FILE` takes an earlier
+`--format json` report (or a baseline file) and adds a "Since the previous
+check" section to every format and a `comparison` object to the JSON: the
+findings that are gone, the new ones, how many are still open, and each
+server's grade before and after. A finding that merely changed its wording (a
+host or a version in the message) counts as still open, not as one fixed and
+one new. A server that left the configuration is listed with "server removed",
+because its findings are gone but nothing was repaired. Findings of the live
+tool scan count as resolved only when both runs used `--deep`: a static run
+cannot see them, and "not looked for" is not "fixed" (the section says how many
+were left out). The earlier file is read as untrusted text; a file that is not
+an mcp-gradecard report exits 2. Reports from versions before 0.5.0 have no
+finding ids and cannot be compared.
 
 **Suppressions.** A JSON file, `{"schema": 1, "suppressions": [...]}`; each
 entry has a `check` (see `--explain`), optionally a `server` and `client`

@@ -18,6 +18,7 @@ import traceback
 from . import __version__
 from . import deep as deep_mod
 from . import baseline as baseline_mod
+from . import compare as compare_mod
 from . import catalog
 from . import detectors
 from . import discovery
@@ -754,6 +755,18 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--write-baseline", metavar="FILE", default=None,
                    help="Write today's findings to FILE and exit 0 "
                         "(exit 2 if a config could not be audited).")
+    p.add_argument("--compare", metavar="FILE", default=None,
+                   help="Set this run against an earlier report (the output "
+                        "of --format json, or a --write-baseline file): "
+                        "which findings are resolved, which are new, which "
+                        "are still open and how each server's grade moved. "
+                        "Live tool-scan findings count as resolved only when "
+                        "both runs used --deep. A file that is not an "
+                        "mcp-gradecard report exits 2.")
+    p.add_argument("--require-servers", action="store_true",
+                   help="Exit 2 when no MCP server was audited (nothing was "
+                        "found, or only empty configs): in CI an empty audit "
+                        "is not a pass.")
     p.add_argument("--suppressions", metavar="FILE", default=None,
                    help="A JSON file of accepted findings, each with a "
                         "reason and an expiry date. A suppressed finding "
@@ -783,7 +796,9 @@ def _build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def _json_report(results: list, warnings: list, policy: dict) -> dict:
+def _json_report(results: list, warnings: list, policy: dict,
+                 deep: bool = False,
+                 comparison: "dict | None" = None) -> dict:
     """The --format json document. Schema: schema/report.schema.json;
     `schema_version` changes only when a field is removed or changes
     meaning (adding fields does not change it)."""
@@ -803,10 +818,14 @@ def _json_report(results: list, warnings: list, policy: dict) -> dict:
         row["findings"] = [finding(f) for f in r["findings"]]
         row["suppressed"] = [finding(f) for f in r.get("suppressed") or []]
         rows.append(row)
-    return {"schema_version": 1,
-            "tool": {"name": "mcp-gradecard", "version": __version__},
-            "results": rows, "summary": scoring.summarize(results),
-            "policy": policy, "warnings": warnings}
+    doc = {"schema_version": 1,
+           "tool": {"name": "mcp-gradecard", "version": __version__},
+           "results": rows, "summary": scoring.summarize(results),
+           "policy": policy, "warnings": warnings,
+           "scan": {"deep": bool(deep)}}
+    if comparison is not None:
+        doc["comparison"] = comparison
+    return doc
 
 
 def _explain(check: str) -> int:
@@ -1053,7 +1072,8 @@ def _main(argv: list[str] | None) -> int:
                         if args.suppressions else None)
         known = (baseline_mod.load_baseline(args.baseline)
                  if args.baseline else None)
-    except baseline_mod.PolicyError as e:
+        previous = (compare_mod.load(args.compare) if args.compare else None)
+    except (baseline_mod.PolicyError, compare_mod.CompareError) as e:
         # A gate that cannot read its own policy must not pass.
         _note(f"error: {e}")
         return 2
@@ -1119,6 +1139,9 @@ def _main(argv: list[str] | None) -> int:
 
     # Baseline and suppressions apply last: after every finding exists.
     policy = baseline_mod.apply(results, suppressions, known)
+    comparison = (compare_mod.compare(previous, results,
+                                      args.deep or bool(tool_results))
+                  if previous is not None else None)
     for e in policy["expired"]:
         _note(f"warning: a suppression of '{e['check']}' expired on "
               f"{e['expires']}; the finding counts again")
@@ -1140,10 +1163,13 @@ def _main(argv: list[str] | None) -> int:
         print(render(results, warnings=warnings, configs=discovered,
                      version=__version__, title=args.report_title,
                      deep=args.deep or bool(tool_results),
-                     prepared_by=args.prepared_by, policy=policy))
+                     prepared_by=args.prepared_by, policy=policy,
+                     comparison=comparison))
     elif args.format == "json":
         print(json.dumps(redact.sanitize_tree(
-            _json_report(results, warnings, policy)), indent=2))
+            _json_report(results, warnings, policy,
+                         args.deep or bool(tool_results), comparison)),
+            indent=2))
     if args.format != "human":
         if args.format in ("sarif", "cyclonedx"):
             for w in warnings:  # JSON carries these inline; SARIF can't
@@ -1157,7 +1183,7 @@ def _main(argv: list[str] | None) -> int:
                                    n_configs=len(discovered) + len(
                                        args.tools_json or ()),
                                    configs=discovered, advice=args.advice,
-                                   policy=policy))
+                                   policy=policy, comparison=comparison))
 
     if args.write_baseline:
         if warnings or fix_failed:
@@ -1177,6 +1203,10 @@ def _main(argv: list[str] | None) -> int:
         return 0
 
     if fix_failed:
+        return 2
+    if args.require_servers and not results:
+        _note("error: --require-servers: no MCP server was audited, so a "
+              "pass cannot be promised")
         return 2
     if args.fail_on:
         threshold = _SEV_RANK[args.fail_on]

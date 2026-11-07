@@ -19,6 +19,7 @@ import html
 import re
 
 from . import catalog, redact, scoring
+from . import compare as compare_mod
 
 _SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 _GRADES = "ABCDF"
@@ -261,7 +262,8 @@ def render_html(results: list[dict], warnings: "list[dict] | None" = None,
                 title: "str | None" = None, deep: bool = False,
                 generated: "str | None" = None,
                 prepared_by: "str | None" = None,
-                policy: "dict | None" = None) -> str:
+                policy: "dict | None" = None,
+                comparison: "dict | None" = None) -> str:
     """A self-contained HTML report (inline styles, no scripts, no external
     resources)."""
     warnings = warnings or []
@@ -307,6 +309,32 @@ def render_html(results: list[dict], warnings: "list[dict] | None" = None,
             w(f"<li><code>{_h(wr['path'])}</code> &lt;{_h(wr['client'])}&gt;: "
               f"{_h(wr['reason'])}</li>")
         w("</ul></section>")
+
+    if comparison:
+        w("<h2>Since the previous check</h2><section class=\"card\">")
+        w(f"<p><strong>{_h(compare_mod.summary_line(comparison))}"
+          "</strong></p>")
+        rows = ([("Resolved", i) for i in comparison["resolved"][:100]]
+                + [("New", i) for i in comparison["new"][:100]])
+        if rows:
+            w("<table><tr><th>Change</th><th>Severity</th><th>Server</th>"
+              "<th>Finding</th></tr>")
+            for kind, i in rows:
+                w(f"<tr><td>{kind}</td><td>{_sev(i['severity'])}</td>"
+                  f"<td class=\"nm\">{_h(i['server'])}</td><td class=\"msg\">"
+                  f"{_h(i['title'])}"
+                  + (" (server removed)" if i.get("server_removed") else "")
+                  + "</td></tr>")
+            w("</table>")
+        if comparison["grade_changes"]:
+            w("<ul class=\"plain\">")
+            for m in comparison["grade_changes"][:100]:
+                w(f"<li><code>{_h(m['server'])}</code>: {_h(m['before'])} "
+                  f"&rarr; {_h(m['after'])}</li>")
+            w("</ul>")
+        if comparison.get("note"):
+            w(f'<div class="meta">{_h(comparison["note"])}</div>')
+        w("</section>")
 
     top = _top(results)
     if top:
@@ -483,7 +511,8 @@ def render_markdown(results: list[dict],
                     title: "str | None" = None, deep: bool = False,
                     generated: "str | None" = None,
                     prepared_by: "str | None" = None,
-                    policy: "dict | None" = None) -> str:
+                    policy: "dict | None" = None,
+                    comparison: "dict | None" = None) -> str:
     """The same report as render_html, in Markdown (a PR comment, a ticket,
     a wiki page)."""
     warnings = warnings or []
@@ -512,6 +541,28 @@ def render_markdown(results: list[dict],
         lines += [f"- {_mc(w['path'])} ({_mc(w['client'])}): {_m(w['reason'])}"
                   for w in warnings]
         lines.append("")
+    if comparison:
+        lines += ["## Since the previous check", "",
+                  f"**{_m(compare_mod.summary_line(comparison))}**", ""]
+        rows = ([("Resolved", i) for i in comparison["resolved"][:100]]
+                + [("New", i) for i in comparison["new"][:100]])
+        if rows:
+            lines += ["| Change | Severity | Server | Finding |",
+                      "|---|---|---|---|"]
+            for kind, i in rows:
+                lines.append(
+                    f"| {kind} | {i['severity'].upper()} | {_mc(i['server'])} "
+                    f"| {_m(i['title'])}"
+                    + (" (server removed)" if i.get("server_removed") else "")
+                    + " |")
+            lines.append("")
+        for m in comparison["grade_changes"][:100]:
+            lines.append(f"- {_mc(m['server'])}: {_m(m['before'])} to "
+                         f"{_m(m['after'])}")
+        if comparison["grade_changes"]:
+            lines.append("")
+        if comparison.get("note"):
+            lines += [_m(comparison["note"]), ""]
     top = _top(results)
     if top:
         lines += ["## Fix these first", "",

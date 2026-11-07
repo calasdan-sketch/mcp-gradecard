@@ -13,6 +13,8 @@
       "properties": {"name": {"const": "mcp-gradecard"}, "version": {"type": "string"}}
     },
     "results": {"type": "array", "items": {"$ref": "#/$defs/result"}},
+    "scan": {"type": "object", "properties": {"deep": {"type": "boolean", "description": "true when the live tool scan (--deep) or a saved tools/list (--tools-json) was part of this run"}}},
+    "comparison": {"type": "object", "description": "Present with --compare: this run set against an earlier report.", "properties": {"previous_version": {"type": "string"}, "previous_overall": {"type": ["string", "null"]}, "overall": {"type": ["string", "null"]}, "resolved": {"type": "array", "items": {"type": "object", "properties": {"server": {"type": "string"}, "client": {"type": "string"}, "check": {"type": "string"}, "severity": {"enum": ["critical", "high", "medium", "low"]}, "title": {"type": "string"}, "server_removed": {"type": "boolean"}}}}, "new": {"type": "array", "items": {"type": "object", "properties": {"server": {"type": "string"}, "client": {"type": "string"}, "check": {"type": "string"}, "severity": {"enum": ["critical", "high", "medium", "low"]}, "title": {"type": "string"}, "server_removed": {"type": "boolean"}}}}, "still_open": {"type": "integer", "minimum": 0}, "grade_changes": {"type": "array", "items": {"type": "object", "properties": {"server": {"type": "string"}, "client": {"type": "string"}, "before": {"type": "string"}, "after": {"type": "string"}}}}, "servers_added": {"type": "array"}, "servers_removed": {"type": "array"}, "not_comparable": {"type": "integer", "minimum": 0}, "note": {"type": "string"}}},
     "summary": {
       "type": "object",
       "required": ["servers", "findings", "by_severity"],

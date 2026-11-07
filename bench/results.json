@@ -1,37 +1,37 @@
 {
  "any_finding": {
-  "false_positive_rate": 0.027,
-  "fn": 15,
+  "false_positive_rate": 0.021,
+  "fn": 13,
   "fp": 3,
-  "precision": 0.972,
-  "recall": 0.876,
-  "tn": 110,
-  "tp": 106
+  "precision": 0.981,
+  "recall": 0.923,
+  "tn": 141,
+  "tp": 155
  },
- "benign": 113,
+ "benign": 144,
  "false_positives": [
   "b-hard-prompt_guard",
   "b-hard-read_secret",
   "h-b-hard-02"
  ],
  "high_plus": {
-  "false_positive_rate": 0.027,
-  "fn": 41,
+  "false_positive_rate": 0.021,
+  "fn": 42,
   "fp": 3,
-  "precision": 0.964,
-  "recall": 0.661,
-  "tn": 110,
-  "tp": 80
+  "precision": 0.977,
+  "recall": 0.75,
+  "tn": 141,
+  "tp": 126
  },
- "malicious": 121,
+ "malicious": 168,
  "medium_plus": {
-  "false_positive_rate": 0.027,
-  "fn": 16,
+  "false_positive_rate": 0.021,
+  "fn": 14,
   "fp": 3,
-  "precision": 0.972,
-  "recall": 0.868,
-  "tn": 110,
-  "tp": 105
+  "precision": 0.981,
+  "recall": 0.917,
+  "tn": 141,
+  "tp": 154
  },
  "missed": [
   "m-exfil-04",
@@ -42,66 +42,64 @@
   "h-m-override-01",
   "h-m-override-03",
   "h-m-exfil-05",
-  "h-m-conceal-04",
   "h-m-priority-01",
   "h-m-deputy-01",
   "h-m-deputy-03",
   "h-m-evasive-01",
-  "h-m-evasive-02",
   "h-m-field-01"
  ],
  "recall_by_class": {
   "conceal": {
+   "flagged": 16,
+   "n": 16
+  },
+  "deputy": {
+   "flagged": 10,
+   "n": 12
+  },
+  "encoded": {
+   "flagged": 10,
+   "n": 10
+  },
+  "evasive": {
+   "flagged": 8,
+   "n": 13
+  },
+  "exfil": {
+   "flagged": 20,
+   "n": 22
+  },
+  "fake-tag": {
+   "flagged": 11,
+   "n": 11
+  },
+  "field": {
    "flagged": 11,
    "n": 12
   },
-  "deputy": {
-   "flagged": 7,
-   "n": 9
+  "hidden": {
+   "flagged": 11,
+   "n": 11
   },
-  "encoded": {
-   "flagged": 7,
-   "n": 7
+  "multilingual": {
+   "flagged": 16,
+   "n": 16
   },
-  "evasive": {
-   "flagged": 2,
-   "n": 8
-  },
-  "exfil": {
+  "override": {
    "flagged": 14,
    "n": 16
   },
-  "fake-tag": {
-   "flagged": 8,
-   "n": 8
-  },
-  "field": {
-   "flagged": 7,
-   "n": 8
-  },
-  "hidden": {
-   "flagged": 7,
-   "n": 7
-  },
-  "multilingual": {
-   "flagged": 10,
-   "n": 10
-  },
-  "override": {
-   "flagged": 10,
-   "n": 12
-  },
   "priority": {
-   "flagged": 5,
-   "n": 6
+   "flagged": 7,
+   "n": 8
   },
   "rug-pull": {
-   "flagged": 8,
-   "n": 8
-  },
-  "shadowing": {
    "flagged": 10,
    "n": 10
+  },
+  "shadowing": {
+   "flagged": 11,
+   "n": 11
   }
  },
  "splits": {
@@ -122,12 +120,12 @@
    ],
    "high_plus": {
     "false_positive_rate": 0.024,
-    "fn": 24,
+    "fn": 20,
     "fp": 2,
-    "precision": 0.968,
-    "recall": 0.714,
+    "precision": 0.97,
+    "recall": 0.762,
     "tn": 83,
-    "tp": 60
+    "tp": 64
    },
    "malicious": 84,
    "medium_plus": {
@@ -150,12 +148,12 @@
   "holdout": {
    "any_finding": {
     "false_positive_rate": 0.036,
-    "fn": 10,
+    "fn": 8,
     "fp": 1,
-    "precision": 0.964,
-    "recall": 0.73,
+    "precision": 0.967,
+    "recall": 0.784,
     "tn": 27,
-    "tp": 27
+    "tp": 29
    },
    "benign": 28,
    "false_positives": [
@@ -163,35 +161,66 @@
    ],
    "high_plus": {
     "false_positive_rate": 0.036,
-    "fn": 17,
+    "fn": 14,
     "fp": 1,
-    "precision": 0.952,
-    "recall": 0.541,
+    "precision": 0.958,
+    "recall": 0.622,
     "tn": 27,
-    "tp": 20
+    "tp": 23
    },
    "malicious": 37,
    "medium_plus": {
     "false_positive_rate": 0.036,
-    "fn": 10,
+    "fn": 8,
     "fp": 1,
-    "precision": 0.964,
-    "recall": 0.73,
+    "precision": 0.967,
+    "recall": 0.784,
     "tn": 27,
-    "tp": 27
+    "tp": 29
    },
    "missed": [
     "h-m-override-01",
     "h-m-override-03",
     "h-m-exfil-05",
-    "h-m-conceal-04",
     "h-m-priority-01",
     "h-m-deputy-01",
     "h-m-deputy-03",
     "h-m-evasive-01",
-    "h-m-evasive-02",
     "h-m-field-01"
    ]
+  },
+  "r3": {
+   "any_finding": {
+    "false_positive_rate": 0.0,
+    "fn": 0,
+    "fp": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "tn": 31,
+    "tp": 47
+   },
+   "benign": 31,
+   "false_positives": [],
+   "high_plus": {
+    "false_positive_rate": 0.0,
+    "fn": 8,
+    "fp": 0,
+    "precision": 1.0,
+    "recall": 0.83,
+    "tn": 31,
+    "tp": 39
+   },
+   "malicious": 47,
+   "medium_plus": {
+    "false_positive_rate": 0.0,
+    "fn": 0,
+    "fp": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "tn": 31,
+    "tp": 47
+   },
+   "missed": []
   }
  }
 }

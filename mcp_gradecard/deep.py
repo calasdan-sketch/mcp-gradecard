@@ -35,6 +35,7 @@ import itertools
 import json
 import os
 import queue
+import re
 import shutil
 import signal
 import subprocess
@@ -380,7 +381,7 @@ _SCHEMA_NODES = ("items", "additionalProperties", "not", "if", "then", "else",
 _SCHEMA_LISTS = ("anyOf", "oneOf", "allOf", "prefixItems")
 
 
-def _parameters(schema) -> list[dict]:
+def _parameters(schema, names: "list | None" = None) -> list[dict]:
     """The texts of a tool's input schema that an agent reads: the
     description and title of each property, its default and constant, the
     members of its enum, its examples - as {"name": property, "description":
@@ -410,6 +411,10 @@ def _parameters(schema) -> list[dict]:
                 children += [(str(n)[:_NAME_SHOWN], c) for n, c in
                              itertools.islice(node[key].items(),
                                               MAX_SCHEMA_NODES)]
+                if names is not None and key == "properties":
+                    names += [n for n in itertools.islice(
+                        node[key], MAX_SCHEMA_NODES) if isinstance(n, str)
+                        and len(n) > 24 and len(names) < MAX_PARAMETER_TEXTS]
         for key in _SCHEMA_NODES:
             children.append((name, node.get(key)))
         for key in _SCHEMA_LISTS:
@@ -452,9 +457,12 @@ def normalize_tool(tool: dict) -> dict:
             annotations.get("title"), str) \
             and annotations["title"].strip():
         entry["annotations_title"] = annotations["title"]
-    parameters = _parameters(tool.get("inputSchema"))
+    names: list = []
+    parameters = _parameters(tool.get("inputSchema"), names)
     if parameters:
         entry["parameters"] = parameters
+    if names:
+        entry["parameter_names"] = names
     outputs = _parameters(tool.get("outputSchema"))
     if outputs:
         entry["outputs"] = outputs
@@ -709,6 +717,14 @@ def probe_server(cfg, timeout: float = 15, cwd: str | None = None) -> dict:
             shutil.rmtree(scratch, ignore_errors=True)
 
 
+_CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
+
+
+def _words_of(name: str) -> str:
+    """snake_case, kebab-case and camelCase as space-separated words."""
+    return _CAMEL.sub(" ", name).replace("_", " ").replace("-", " ")
+
+
 def _texts(tool: dict):
     """(where, text) for every text of a tool that is read: its description,
     its title and the title in its annotations, then each text of its input
@@ -718,6 +734,11 @@ def _texts(tool: dict):
         yield "title", tool.get("title")
     if tool.get("annotations_title"):
         yield "annotations title", tool.get("annotations_title")
+    for pname in tool.get("parameter_names") or ():
+        # a parameter's own name is read by the agent too (snake_case,
+        # kebab-case and camelCase split into words); short names are words
+        if isinstance(pname, str):
+            yield "a parameter name", _words_of(pname)
     for parameter in tool.get("parameters") or ():
         name = str(parameter.get("name"))[:_NAME_SHOWN]
         yield (f"parameter '{name}' description" if name
