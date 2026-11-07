@@ -9,7 +9,6 @@ finding: a value may be a secret or a path that identifies a person.
 
 from __future__ import annotations
 
-import os
 import re
 import urllib.parse
 
@@ -69,6 +68,31 @@ def _loopback(value: str) -> bool:
     return host in ("localhost", "127.0.0.1", "::1") or host.endswith(".localhost")
 
 
+_ASSIGN = re.compile(r"(?<![\w$])([A-Za-z_][A-Za-z0-9_-]{1,40})=(\"[^\"]*\"|'[^']*'|"
+                     r"[^\s;&|]*)")
+_WRAPPERS = _SHELLS | {"cmd", "powershell", "pwsh", "setsid", "stdbuf", "exec"}
+
+
+def _inline_env(command: str, args: list) -> dict:
+    """NAME=value written on the command line instead of in `env`:
+    `env LD_PRELOAD=/x.so node s.js`, `bash -c "NODE_OPTIONS=-r./x node s"`,
+    `cmd /c set LD_PRELOAD=...`. Only for launchers that pass them on."""
+    found: dict = {}
+    if command not in _WRAPPERS:
+        return found
+    for arg in args[:60]:
+        if len(arg) > 20_000:
+            arg = arg[:20_000]
+        for m in _ASSIGN.finditer(arg):
+            value = m.group(2)
+            if value[:1] in "\"'":
+                value = value[1:-1]
+            found.setdefault(m.group(1), value)
+            if len(found) >= 40:
+                return found
+    return found
+
+
 def detect_launch_env(name: str, cfg: dict) -> list[dict]:
     """High: a variable that runs someone's code at start, or turns TLS
     checking off. Medium: a variable that changes which certificates the
@@ -76,7 +100,11 @@ def detect_launch_env(name: str, cfg: dict) -> list[dict]:
     machine. Low: a library search path. Also high: the server is started
     through sudo or a like tool, so it runs with more rights than the agent."""
     findings: list[dict] = []
-    env = cfg.get("env") if isinstance(cfg.get("env"), dict) else {}
+    env = dict(cfg.get("env")) if isinstance(cfg.get("env"), dict) else {}
+    command = _base(cfg.get("command"))
+    args = [a for a in cfg.get("args") or [] if isinstance(a, str)]
+    for key, value in _inline_env(command, args).items():
+        env.setdefault(key, value)
     high: list[str] = []
     medium: list[str] = []
     low: list[str] = []
@@ -123,8 +151,6 @@ def detect_launch_env(name: str, cfg: dict) -> list[dict]:
             "environment moves the server's library search path (" +
             ", ".join(sorted(low)[:6]) + "): code in that folder runs inside "
             "the server, so it should be a folder only you can write to"))
-    command = _base(cfg.get("command"))
-    args = [a for a in cfg.get("args") or [] if isinstance(a, str)]
     elevated = command in _ELEVATORS or (
         command in _SHELLS and any(_ELEVATION_WORD.search(a) for a in args[:40]))
     raw = str(cfg.get("command") or "")

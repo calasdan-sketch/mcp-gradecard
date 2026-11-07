@@ -206,6 +206,22 @@ class TestLaunchEnv(unittest.TestCase):
         found = detectors.audit_server("s", {"command": "x", "env": {"LD_PRELOAD": "/x"}})
         self.assertIn("launch-env", [f["check"] for f in found])
 
+    def test_assignments_on_the_command_line_count_as_env(self):
+        for server in ({"command": "env", "args": ["LD_PRELOAD=/x.so", "node", "s.js"]},
+                       {"command": "bash", "args": ["-c", "NODE_OPTIONS='--require ./x.js' node s.js"]},
+                       {"command": "cmd", "args": ["/c", "set NODE_TLS_REJECT_UNAUTHORIZED=0&& node s.js"]}):
+            with self.subTest(server=server["command"]):
+                self.assertIn(("high", "launch-env"), self.names(server))
+        # not a wrapper, or not a variable that matters
+        self.assertEqual(self.names({"command": "node", "args": ["s.js", "--x=LD_PRELOAD=/x"]}), [])
+        self.assertEqual(self.names({"command": "env", "args": ["FOO=bar", "node", "s.js"]}), [])
+
+    def test_a_huge_argument_is_bounded(self):
+        import time
+        start = time.monotonic()
+        launchenv.detect_launch_env("s", {"command": "bash", "args": ["-c", "A=" * 2_000_000]})
+        self.assertLess(time.monotonic() - start, 5)
+
     def test_non_string_values_do_not_crash(self):
         self.assertEqual(self.names({"command": "x", "env": {"NODE_OPTIONS": 5, "A": None}}), [])
 

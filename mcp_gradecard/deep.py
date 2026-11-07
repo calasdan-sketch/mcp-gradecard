@@ -414,7 +414,9 @@ def _parameters(schema, names: "list | None" = None) -> list[dict]:
                 if names is not None and key == "properties":
                     names += [n for n in itertools.islice(
                         node[key], MAX_SCHEMA_NODES) if isinstance(n, str)
-                        and len(n) > 24 and len(names) < MAX_PARAMETER_TEXTS]
+                        and len(n) >= 10 and len(names) < MAX_PARAMETER_TEXTS
+                        and (_CAMEL.search(n) or "_" in n or "-" in n
+                             or " " in n)]
         for key in _SCHEMA_NODES:
             children.append((name, node.get(key)))
         for key in _SCHEMA_LISTS:

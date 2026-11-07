@@ -24,7 +24,12 @@ inside it. Prices are not set here: that is the seller's decision.
 - Read every `critical` and `high` yourself before the report goes out. A match
   from the description scan is a lead, not a verdict.
 - Agree suppressions with the client in writing; each needs a reason and a date.
-- Re-run after they fix things and send both reports.
+- Re-run after they fix things and send both reports. Keep the first run's
+  `--format json` output, then run again with `--compare first.json`: the
+  second report opens with "Since the previous check" (resolved, still open,
+  new, and each server's grade before and after). Findings of the live tool
+  scan count as resolved only when both runs used `--deep`; the report says how
+  many were left out.
 
 ## What you can say
 
@@ -35,7 +40,7 @@ inside it. Prices are not set here: that is the seller's decision.
 ## What you cannot say
 
 - That a server is safe, secure or certified; that the description scan finds
-  all poisoning (measured recall on the author's holdout set: 0.73); that a
+  all poisoning (first-contact recall on new attack sets written by its author: 0.49 and 0.41, see the benchmark); that a
   package is not malicious (there is no registry lookup, and the advisory feed
   is small); that any standard is met.
 - Anything about servers that were not launched or whose tool lists were not

@@ -857,42 +857,54 @@ there.
 
 ## Benchmark: how well does the description scan work?
 
-`bench/` holds 234 invented MCP tool definitions (121 malicious across 13
-attack classes, 113 benign including look-alikes such as a security tool that
+`bench/` holds 356 invented MCP tool definitions (197 malicious across 13
+attack classes, 159 benign including look-alikes such as a security tool that
 quotes an attack), the script that builds them (`make_corpus.py`) and the one
 that measures the scan (`run.py`). Nothing in it is a working exploit; hosts
 are reserved example names. Re-run it with `python bench/run.py` (add `--write`
 to refresh `bench/results.json`; a test fails if the committed file is stale).
 
-Measured on 2026-11-07 (0.5.0; "any finding" means at least one finding of
-any severity on that tool):
+The corpus is in four parts, written at different times, and only the part
+that was never used to change the scanner says anything about attacks the
+author has not seen:
 
-| | malicious | benign | recall | precision | false-positive rate |
-|---|---|---|---|---|---|
-| 0.4.0 scanner, whole corpus | 121 | 113 | 0.744 | 0.968 | 0.027 |
-| 0.5.0 scanner, whole corpus | 121 | 113 | 0.876 | 0.972 | 0.027 |
-| 0.5.0, **holdout** (never used to tune) | 37 | 28 | 0.730 | 0.964 | 0.036 |
-| 0.5.0, dev set (used to tune) | 84 | 85 | 0.940 | 0.975 | 0.024 |
+| Part | Written | malicious | benign | recall | precision | false-positive rate |
+|---|---|---|---|---|---|---|
+| dev | first; the scanner was tuned on it | 84 | 85 | 0.940 | 0.975 | 0.024 |
+| holdout | after that, in fresh wording | 37 | 28 | 0.784 | 0.967 | 0.036 |
+| r3 | round 3, red-team wording | 47 | 31 | **0.489 before tuning**, 1.000 after | 1.000 | 0.000 |
+| r3b | round 3, after the r3 changes | 29 | 15 | **0.414 before tuning**, 1.000 after | 0.923 before, 0.967 after | 0.067 |
+| all four, 0.5.0 final | | 197 | 159 | 0.934 | 0.979 | 0.025 |
 
-Read the holdout row. The dev entries were written first, the scanner was
-then extended to catch what it missed on them (approval bypass, credential
-relay, priority claims, a persona jailbreak, Japanese and Korean), and the
-holdout was written afterwards in fresh wording; the holdout moved from 0.676
-to 0.730 recall under those changes. The corpus is the author's, so it
-favours the author's scanner: it shows what the scan catches and where it
-does not (paraphrase and euphemism are the weakest class, 2 of 8), not how it
-does on attacks nobody here thought of. At "high or higher" the whole-corpus
-recall is 0.661. Rug-pull (pinned definition changed) and tool-shadowing are
-checked by hash and by name, 8 of 8 and 10 of 10, with no false alarm on
-re-listed tools.
+("Recall" is the share of malicious tools with at least one finding of any
+severity. The "before tuning" figures are each part's first measurement,
+kept in `bench/r3_before.json` and `bench/r3b_before.json`; the "after" figures
+were reached by adding patterns for what was missed, so they show that the
+patterns work on those texts, not that new attacks will be caught.)
+
+Read the "before tuning" rows. A new set of attacks written by the same
+author in fresh wording is caught less than half the time on first contact
+(0.49 and 0.41), where the earlier 0.73 holdout figure suggested more. The
+scan is a pattern reader: paraphrase, euphemism, a role-play frame and a
+persona ("let's play a game") are its weakest classes, and a security tool
+that quotes an attack is flagged (4 of 159 benign here). It finds the
+common moves and a lead for a person to read; it does not prove a server is
+clean. At "high or higher" the whole-corpus recall is 0.736. Rug-pull (pinned
+definition changed) and tool-shadowing are checked by hash and by name, 11 of
+11 and 12 of 12, with no false alarm on re-listed tools. No false-alarm rate
+on real-world descriptions was measured beyond the 159 invented benign ones
+and a hand-written list of ordinary descriptions in the tests.
 
 The same tool definitions through Cisco's offline YARA analyzer
 (`cisco-ai-mcp-scanner` 4.8.7, one tool at a time; its LLM, API and
 VirusTotal engines need keys and were not run), on the text classes only (it
-has no pins and sees one server): recall 0.320, false-positive rate 0.028,
-against 0.854 and 0.028 for mcp-gradecard; on the holdout 0.250 against 0.688.
-This is one engine of that product on a corpus written for this one: it is
-not a verdict on the product.
+has no pins and sees one server): recall 0.253 and false-positive rate 0.026
+over all four parts, against 0.925 and 0.026 for mcp-gradecard. Because
+Cisco's rules were not tuned on this corpus and ours were, the fair
+comparison is the first-contact one: 0.205 for Cisco on r3 and 0.074 on r3b,
+against 0.48 (r3) and 0.37 (r3b) for mcp-gradecard on the same text classes
+before its patterns were extended. This is one engine of that product on a corpus
+written for this one: it is not a verdict on the product.
 
 ## Reports and OWASP MCP Top 10
 
@@ -986,9 +998,11 @@ What mcp-gradecard does not do, so that you do not find out the hard way:
 
 **New in 0.5.0**
 
-- The description scan is a pattern reader with a measured recall of 0.73 on
-  attacks written after it was tuned (see the benchmark): paraphrase and
-  euphemism get through, and a tool that quotes an attack can be flagged.
+- The description scan is a pattern reader. On new sets of attacks written
+  by its author in fresh wording it caught 0.49 and 0.41 on first contact
+  (see the benchmark); every pattern added afterwards fits the texts it was
+  added for. Paraphrase, euphemism and role-play get through, and a tool that
+  quotes an attack can be flagged.
 - `typosquat` compares names with a short built-in list of popular packages;
   it knows nothing of who published a package or when. A new look-alike of a
   package that is not on the list is not seen.
@@ -998,6 +1012,18 @@ What mcp-gradecard does not do, so that you do not find out the hard way:
   Q, LM Studio, Cline, Roo Code, WSL, the Microsoft Store package of Claude
   Desktop) come from memory or user reports, not from the clients' pages.
 - The GitHub Action has not been run on a hosted runner.
+- `launch-env` reads the variables it has a table entry for (code loaders,
+  certificate switches, proxies, library paths). Any other variable that a
+  program happens to honour, and a value another variable expands into, is
+  not seen. `elevated-launch` sees `sudo`, `doas`, `pkexec` and `gsudo` at
+  the front of a command or in a `sh -c` script, not a program that is itself
+  setuid or a service that is installed to run as root.
+- `--compare` matches findings by an id built from the client, server name,
+  check and message with its numbers removed: a renamed server or a finding
+  whose wording changed with the server's version appears as resolved plus
+  new (or, for the same check and severity on the same server, as still
+  open). It compares two files; it does not check that they were made from
+  the same machine.
 
 **Reading configs**
 
