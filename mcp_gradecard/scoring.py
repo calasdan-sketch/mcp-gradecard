@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import textwrap
 
 from . import catalog, discovery, redact
 
@@ -78,7 +79,8 @@ def _deep_line(r: dict) -> "str | None":
 
 
 def render_human(results: list[dict], warnings: list[dict] | None = None,
-                 n_configs: int = 0, configs: list[dict] | None = None) -> str:
+                 n_configs: int = 0, configs: list[dict] | None = None,
+                 advice: bool = False, policy: "dict | None" = None) -> str:
     """Render the human report.
 
     warnings: discovery warnings for config files that existed but were
@@ -138,7 +140,20 @@ def render_human(results: list[dict], warnings: list[dict] | None = None,
         for f in sorted(r["findings"],
                         key=lambda x: _SEV_ORDER.get(x["severity"], 9)):
             lines.append(f"        [{f['severity'].upper():8}] "
-                         f"{s(f['message'])}")
+                         f"{s(f['message'])}"
+                         + ("  (known)" if f.get("known") else ""))
+            if advice:
+                fix = catalog.remediation(f["check"])
+                if fix:
+                    for i, part in enumerate(textwrap.wrap(
+                            fix, 84, break_long_words=False) or [""]):
+                        lines.append("            " + ("fix: " if i == 0
+                                                       else "     ") + part)
+        for f in r.get("suppressed") or []:
+            sup = f.get("suppression") or {}
+            lines.append(f"        [SUPPRESSED] {s(f['check'])} until "
+                         f"{s(str(sup.get('expires')))}: "
+                         f"{s(str(sup.get('reason')))}")
         deep = _deep_line(r)
         if deep:
             lines.append(f"        {deep}")
@@ -149,6 +164,19 @@ def render_human(results: list[dict], warnings: list[dict] | None = None,
               f"  {s['servers']} servers {sym('·')} {s['findings']} findings "
               f"(crit={s['by_severity']['critical']} high={s['by_severity']['high']} "
               f"med={s['by_severity']['medium']} low={s['by_severity']['low']})"]
+    if policy:
+        bits = []
+        if policy.get("baseline"):
+            bits.append(f"baseline: {policy['new']} new, {policy['known']} "
+                        f"known, {policy['fixed']} fixed")
+        if policy.get("suppressed"):
+            bits.append(f"{policy['suppressed']} suppressed (listed above)")
+        if bits:
+            lines.append("  " + f" {sym('·')} ".join(bits))
+        for e in policy.get("expired") or []:
+            lines.append(f"  [!] a suppression of '{s(str(e['check']))}' "
+                         f"expired on {s(str(e['expires']))}: the finding "
+                         "counts again")
     if warnings:
         lines.append(f"  [mcp-gradecard] warning: {len(warnings)} config file(s) "
                      f"existed but were not audited {sym('—')} results are "
@@ -202,7 +230,8 @@ _SARIF_LEVEL = {"critical": "error", "high": "error",
                 "medium": "warning", "low": "note"}
 
 
-def render_sarif(results: list[dict], version: str) -> dict:
+def render_sarif(results: list[dict], version: str,
+                 baseline: bool = False) -> dict:
     """SARIF 2.1.0 log (GitHub code scanning, IDE viewers). One rule per
     check id; each finding points at the config file that holds the server."""
     import pathlib
@@ -213,14 +242,16 @@ def render_sarif(results: list[dict], version: str) -> dict:
             uri = pathlib.Path(r["path"]).resolve().as_uri()
         except ValueError:
             uri = str(r["path"]).replace("\\", "/")
-        for f in r["findings"]:
+        listed = [(f, None) for f in r["findings"]] + [
+            (f, f.get("suppression")) for f in r.get("suppressed") or []]
+        for f, sup in listed:
             rule = rules.setdefault(f["check"], _sarif_rule(f["check"]))
             props = rule["properties"]
             if float(catalog.security_severity(f["severity"])) > float(
                     props["security-severity"]):
                 props["security-severity"] = catalog.security_severity(
                     f["severity"])
-            out.append({
+            item = {
                 "ruleId": f["check"],
                 "level": _SARIF_LEVEL.get(f["severity"], "note"),
                 "message": {"text": f"{r['name']}: {f['message']}"},
@@ -232,7 +263,16 @@ def render_sarif(results: list[dict], version: str) -> dict:
                                "server": r["name"], "client": r["client"],
                                **({"project": r["project"]}
                                   if "project" in r else {})},
-            })
+            }
+            if sup is not None:
+                item["suppressions"] = [{
+                    "kind": "external", "status": "accepted",
+                    "justification": f"{sup.get('reason')} "
+                                     f"(until {sup.get('expires')})"}]
+            elif baseline:
+                item["baselineState"] = ("unchanged" if f.get("known")
+                                         else "new")
+            out.append(item)
     return {
         "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
         "version": "2.1.0",

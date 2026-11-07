@@ -594,6 +594,9 @@ class TestProjectServersAreNotLaunched(unittest.TestCase):
         ("vscode-workspace", (".vscode", "settings.json"), ("mcp", "servers")),
         ("devin-project", (".devin", "mcp_config.json"), ("mcpServers",)),
         ("zed-project", (".zed", "settings.json"), ("context_servers",)),
+        ("gemini-project", (".gemini", "settings.json"), ("mcpServers",)),
+        ("amazon-q-project", (".amazonq", "mcp.json"), ("mcpServers",)),
+        ("roo-code-project", (".roo", "mcp.json"), ("mcpServers",)),
     )
 
     def setUp(self):

@@ -10,7 +10,7 @@ import urllib.request
 from importlib import resources
 from typing import NamedTuple
 
-from . import redact, urls
+from . import redact, supply, urls
 
 #: The advisory feed, shipped as package data next to this module.
 FEED_NAME = "advisories.json"
@@ -1967,6 +1967,7 @@ STATIC_DETECTORS = (
     detect_plaintext_secret,
     detect_transport,
     detect_container_escape,
+    supply.detect_typosquat,
 )
 
 
@@ -1982,6 +1983,7 @@ DETECTOR_SUBJECT = {
     "detect_plaintext_secret": "plain-text secrets",
     "detect_transport": "how a remote server is reached",
     "detect_container_escape": "container options",
+    "detect_typosquat": "look-alike package names",
 }
 
 

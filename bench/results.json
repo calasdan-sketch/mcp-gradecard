@@ -1,0 +1,197 @@
+{
+ "any_finding": {
+  "false_positive_rate": 0.027,
+  "fn": 15,
+  "fp": 3,
+  "precision": 0.972,
+  "recall": 0.876,
+  "tn": 110,
+  "tp": 106
+ },
+ "benign": 113,
+ "false_positives": [
+  "b-hard-prompt_guard",
+  "b-hard-read_secret",
+  "h-b-hard-02"
+ ],
+ "high_plus": {
+  "false_positive_rate": 0.027,
+  "fn": 41,
+  "fp": 3,
+  "precision": 0.964,
+  "recall": 0.661,
+  "tn": 110,
+  "tp": 80
+ },
+ "malicious": 121,
+ "medium_plus": {
+  "false_positive_rate": 0.027,
+  "fn": 16,
+  "fp": 3,
+  "precision": 0.972,
+  "recall": 0.868,
+  "tn": 110,
+  "tp": 105
+ },
+ "missed": [
+  "m-exfil-04",
+  "m-evasive-01",
+  "m-evasive-02",
+  "m-evasive-03",
+  "m-evasive-06",
+  "h-m-override-01",
+  "h-m-override-03",
+  "h-m-exfil-05",
+  "h-m-conceal-04",
+  "h-m-priority-01",
+  "h-m-deputy-01",
+  "h-m-deputy-03",
+  "h-m-evasive-01",
+  "h-m-evasive-02",
+  "h-m-field-01"
+ ],
+ "recall_by_class": {
+  "conceal": {
+   "flagged": 11,
+   "n": 12
+  },
+  "deputy": {
+   "flagged": 7,
+   "n": 9
+  },
+  "encoded": {
+   "flagged": 7,
+   "n": 7
+  },
+  "evasive": {
+   "flagged": 2,
+   "n": 8
+  },
+  "exfil": {
+   "flagged": 14,
+   "n": 16
+  },
+  "fake-tag": {
+   "flagged": 8,
+   "n": 8
+  },
+  "field": {
+   "flagged": 7,
+   "n": 8
+  },
+  "hidden": {
+   "flagged": 7,
+   "n": 7
+  },
+  "multilingual": {
+   "flagged": 10,
+   "n": 10
+  },
+  "override": {
+   "flagged": 10,
+   "n": 12
+  },
+  "priority": {
+   "flagged": 5,
+   "n": 6
+  },
+  "rug-pull": {
+   "flagged": 8,
+   "n": 8
+  },
+  "shadowing": {
+   "flagged": 10,
+   "n": 10
+  }
+ },
+ "splits": {
+  "dev": {
+   "any_finding": {
+    "false_positive_rate": 0.024,
+    "fn": 5,
+    "fp": 2,
+    "precision": 0.975,
+    "recall": 0.94,
+    "tn": 83,
+    "tp": 79
+   },
+   "benign": 85,
+   "false_positives": [
+    "b-hard-prompt_guard",
+    "b-hard-read_secret"
+   ],
+   "high_plus": {
+    "false_positive_rate": 0.024,
+    "fn": 24,
+    "fp": 2,
+    "precision": 0.968,
+    "recall": 0.714,
+    "tn": 83,
+    "tp": 60
+   },
+   "malicious": 84,
+   "medium_plus": {
+    "false_positive_rate": 0.024,
+    "fn": 6,
+    "fp": 2,
+    "precision": 0.975,
+    "recall": 0.929,
+    "tn": 83,
+    "tp": 78
+   },
+   "missed": [
+    "m-exfil-04",
+    "m-evasive-01",
+    "m-evasive-02",
+    "m-evasive-03",
+    "m-evasive-06"
+   ]
+  },
+  "holdout": {
+   "any_finding": {
+    "false_positive_rate": 0.036,
+    "fn": 10,
+    "fp": 1,
+    "precision": 0.964,
+    "recall": 0.73,
+    "tn": 27,
+    "tp": 27
+   },
+   "benign": 28,
+   "false_positives": [
+    "h-b-hard-02"
+   ],
+   "high_plus": {
+    "false_positive_rate": 0.036,
+    "fn": 17,
+    "fp": 1,
+    "precision": 0.952,
+    "recall": 0.541,
+    "tn": 27,
+    "tp": 20
+   },
+   "malicious": 37,
+   "medium_plus": {
+    "false_positive_rate": 0.036,
+    "fn": 10,
+    "fp": 1,
+    "precision": 0.964,
+    "recall": 0.73,
+    "tn": 27,
+    "tp": 27
+   },
+   "missed": [
+    "h-m-override-01",
+    "h-m-override-03",
+    "h-m-exfil-05",
+    "h-m-conceal-04",
+    "h-m-priority-01",
+    "h-m-deputy-01",
+    "h-m-deputy-03",
+    "h-m-evasive-01",
+    "h-m-evasive-02",
+    "h-m-field-01"
+   ]
+  }
+ }
+}

@@ -170,7 +170,105 @@ def candidate_paths() -> list[tuple[str, str]]:
     paths.append(("zed-project", os.path.join(cwd, ".zed", "settings.json")))
     paths += [("claude-desktop", os.path.join(d, "claude_desktop_config.json"))
               for d in desktop_dirs]
+    paths += _more_clients(r, cwd, vscode_dirs)
+    paths += _windows_store_desktop(r["local_appdata"])
+    paths += _wsl_windows_homes()
     return paths
+
+
+def _more_clients(r: dict, cwd: str, vscode_dirs: "list[str]"
+                  ) -> "list[tuple[str, str]]":
+    """Clients added in 0.5.0. Gemini CLI's two locations are from its
+    documentation (read 2026-11-07); the rest are **unverified** (see the
+    README) and only read when the file exists."""
+    home = r["home"]
+    paths = [
+        ("gemini", os.path.join(home, ".gemini", "settings.json")),
+        ("gemini-project", os.path.join(cwd, ".gemini", "settings.json")),
+        ("codex", os.path.join(os.environ.get("CODEX_HOME") or os.path.join(
+            home, ".codex"), "config.toml")
+         if not os.environ.get(HOME_ENV)
+         else os.path.join(home, ".codex", "config.toml")),
+        ("amazon-q", os.path.join(home, ".aws", "amazonq", "mcp.json")),
+        ("amazon-q-project", os.path.join(cwd, ".amazonq", "mcp.json")),
+        ("lm-studio", os.path.join(home, ".lmstudio", "mcp.json")),
+        ("roo-code-project", os.path.join(cwd, ".roo", "mcp.json")),
+    ]
+    for d in vscode_dirs:
+        store = os.path.join(d, "globalStorage")
+        paths.append(("cline", os.path.join(
+            store, "saoudrizwan.claude-dev", "settings",
+            "cline_mcp_settings.json")))
+        paths.append(("roo-code", os.path.join(
+            store, "rooveterinaryinc.roo-cline", "settings",
+            "mcp_settings.json")))
+    return paths
+
+
+def _windows_store_desktop(local_appdata: str) -> "list[tuple[str, str]]":
+    """Claude Desktop installed from the Microsoft Store or as an MSIX keeps
+    its config inside the package folder, not in %APPDATA%\\Claude
+    (unverified: reported by users, not by Anthropic's pages)."""
+    if not local_appdata:
+        return []
+    folder = os.path.join(local_appdata, "Packages")
+    try:
+        names = sorted(n for n in os.listdir(folder)
+                       if n.lower().startswith("claude_"))
+    except OSError:
+        return []
+    return [("claude-desktop", os.path.join(
+        folder, n, "LocalCache", "Roaming", "Claude",
+        "claude_desktop_config.json")) for n in names[:8]]
+
+
+#: Where WSL sees the Windows drive. A test points this elsewhere.
+WSL_USERS = "/mnt/c/Users"
+_NOT_PROFILES = {"public", "default", "default user", "all users",
+                 "defaultapppool", "desktop.ini"}
+
+
+def in_wsl() -> bool:
+    if os.environ.get("WSL_DISTRO_NAME"):
+        return True
+    try:
+        with open("/proc/sys/kernel/osrelease", encoding="ascii",
+                  errors="replace") as f:
+            return "microsoft" in f.read().lower()
+    except OSError:
+        return False
+
+
+def _wsl_windows_homes() -> "list[tuple[str, str]]":
+    """Inside WSL the clients usually run on the Windows side: their configs
+    sit under /mnt/c/Users/<name>. Read-only discovery; never rewritten by
+    --fix from here unless it is the same file. Skipped while MCP_AUDIT_HOME
+    isolates discovery."""
+    if os.environ.get(HOME_ENV) or not in_wsl():
+        return []
+    try:
+        users = sorted(n for n in os.listdir(WSL_USERS)
+                       if n.lower() not in _NOT_PROFILES)
+    except OSError:
+        return []
+    out: "list[tuple[str, str]]" = []
+    for n in users[:20]:
+        home = os.path.join(WSL_USERS, n)
+        roaming = os.path.join(home, "AppData", "Roaming")
+        out += [
+            ("claude-desktop", os.path.join(roaming, "Claude",
+                                            "claude_desktop_config.json")),
+            ("claude-code", os.path.join(home, ".claude.json")),
+            ("cursor", os.path.join(home, ".cursor", "mcp.json")),
+            ("vscode-mcp", os.path.join(roaming, "Code", "User", "mcp.json")),
+            ("vscode", os.path.join(roaming, "Code", "User",
+                                    "settings.json")),
+            ("windsurf", os.path.join(home, ".codeium", "windsurf",
+                                      "mcp_config.json")),
+            ("gemini", os.path.join(home, ".gemini", "settings.json")),
+        ]
+        out += _windows_store_desktop(os.path.join(home, "AppData", "Local"))
+    return out
 
 
 # Every top-level key some client stores servers under. A known client's
@@ -194,7 +292,8 @@ _SERVER_KEYS = ("mcpServers", "servers", "mcp", "context_servers")
 #: not to the person running mcp-gradecard: whoever wrote the project wrote them,
 #: so --deep leaves their servers alone unless --probe-project is given.
 PROJECT_CLIENTS = ("claude-code-project", "cursor-project", "vscode-workspace",
-                   "vscode-workspace-mcp", "devin-project", "zed-project")
+                   "vscode-workspace-mcp", "devin-project", "zed-project",
+                   "gemini-project", "amazon-q-project", "roo-code-project")
 
 
 def is_project_client(client: str) -> bool:
@@ -326,6 +425,8 @@ def _read_json(path: str):
     except UnicodeError:
         raise ConfigError("not UTF-8 text (and no UTF-16/32 byte order mark)"
                           ) from None
+    if path.lower().endswith(".toml"):
+        return _read_toml(text)
     try:
         return jsonc.loads(text)
     except RecursionError:
@@ -334,6 +435,25 @@ def _read_json(path: str):
         raise ConfigError("too large to parse") from None
     except ValueError as e:
         raise ConfigError(f"unparseable JSON ({e})") from None
+
+
+def _read_toml(text: str):
+    """A TOML config (Codex CLI) as the same document shape the JSON clients
+    use: its `mcp_servers` table is read as `mcpServers`."""
+    try:
+        import tomllib
+    except ImportError:
+        raise ConfigError("a TOML file needs Python 3.11 or newer to be "
+                          "read; not audited") from None
+    try:
+        data = tomllib.loads(text)
+    except RecursionError:
+        raise ConfigError("nested too deeply to parse") from None
+    except ValueError as e:
+        raise ConfigError(f"unparseable TOML ({e})") from None
+    if isinstance(data, dict) and "mcp_servers" in data:
+        data = {**data, "mcpServers": data["mcp_servers"]}
+    return data
 
 
 def load_config(path: str) -> dict:

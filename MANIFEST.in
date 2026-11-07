@@ -3,3 +3,5 @@ include mcp_gradecard/advisories.json
 recursive-include mcp_audit *.py
 recursive-include tests *.py *.json
 global-exclude __pycache__ *.py[cod]
+recursive-include schema *.json
+recursive-include bench *.py *.json

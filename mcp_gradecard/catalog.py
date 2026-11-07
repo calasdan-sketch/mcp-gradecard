@@ -87,6 +87,13 @@ CHECKS: "dict[str, tuple[str, tuple[str, ...], str]]" = {
         ("MCP04",),
         "Pin an exact version (pkg@1.2.3 / pkg==1.2.3) so a compromised "
         "release cannot reach you on the next launch."),
+    "typosquat": (
+        "Package name resembles a well-known MCP package",
+        ("MCP04",),
+        "Compare the name letter by letter with the package you meant and "
+        "check its publisher on the registry page. If it is the right "
+        "package, accept it with a suppression that says so; if not, "
+        "replace it with the real name."),
     "known-vulnerable": (
         "Known-vulnerable package version",
         ("MCP04",),
@@ -192,3 +199,26 @@ def security_severity(severity: str) -> str:
     """GitHub code scanning's `security-severity` (a CVSS-like 0-10 score as
     a string), which it uses to show critical/high/medium/low."""
     return _SEVERITY_SCORE.get(severity, "3.0")
+
+
+def explain(check: str) -> str:
+    """Plain-language text for `--explain CHECK`: what the check is, what to
+    do, which OWASP MCP risks it is evidence of, how to accept it."""
+    entry = CHECKS.get(check)
+    if entry is None:
+        return ""
+    refs = "; ".join(f"{r} {OWASP[r]}" for r in entry[1]) or "none"
+    return "\n".join((
+        f"{check}: {entry[0]}",
+        "",
+        "What to do:",
+        "  " + entry[2],
+        "",
+        f"OWASP MCP Top 10: {refs}",
+        "",
+        "To accept it for a while, with a reason, put this in a file and run",
+        "with --suppressions FILE (the date is required):",
+        '  {"schema": 1, "suppressions": [{"check": "%s",' % check,
+        '    "server": "NAME", "reason": "why this is accepted",',
+        '    "expires": "YYYY-MM-DD"}]}',
+    ))

@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/calasdan-sketch/mcp-gradecard/blob/main/schema/report.schema.json",
+  "title": "mcp-gradecard --format json, schema_version 1",
+  "description": "schema_version changes only when a field is removed or changes meaning. New fields may appear without a change; readers should ignore fields they do not know.",
+  "type": "object",
+  "required": ["schema_version", "tool", "results", "summary", "policy", "warnings"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "tool": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {"name": {"const": "mcp-gradecard"}, "version": {"type": "string"}}
+    },
+    "results": {"type": "array", "items": {"$ref": "#/$defs/result"}},
+    "summary": {
+      "type": "object",
+      "required": ["servers", "findings", "by_severity"],
+      "properties": {
+        "servers": {"type": "integer", "minimum": 0},
+        "findings": {"type": "integer", "minimum": 0},
+        "by_severity": {
+          "type": "object",
+          "required": ["critical", "high", "medium", "low"],
+          "properties": {
+            "critical": {"type": "integer"}, "high": {"type": "integer"},
+            "medium": {"type": "integer"}, "low": {"type": "integer"}
+          }
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "required": ["suppressed", "expired", "known", "new", "fixed", "baseline"],
+      "properties": {
+        "suppressed": {"type": "integer"},
+        "expired": {"type": "array", "items": {"type": "object", "required": ["check", "expires"]}},
+        "known": {"type": "integer"}, "new": {"type": "integer"}, "fixed": {"type": "integer"},
+        "baseline": {"type": "boolean"}
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {"type": "object", "required": ["client", "path", "reason"]}
+    }
+  },
+  "$defs": {
+    "severity": {"enum": ["critical", "high", "medium", "low"]},
+    "finding": {
+      "type": "object",
+      "required": ["severity", "check", "message", "id", "title", "owasp", "fix"],
+      "properties": {
+        "severity": {"$ref": "#/$defs/severity"},
+        "check": {"type": "string"},
+        "message": {"type": "string"},
+        "id": {"type": "string", "description": "Stable across machines: client, server name, check and the message without numbers."},
+        "title": {"type": "string"},
+        "owasp": {"type": "array", "items": {"type": "string", "pattern": "^MCP(0[1-9]|10)$"}},
+        "fix": {"type": "string"},
+        "known": {"type": "boolean", "description": "Present with --baseline: true when the finding is in the baseline."},
+        "suppression": {
+          "type": "object",
+          "required": ["reason", "expires"],
+          "properties": {"reason": {"type": "string"}, "expires": {"type": "string"}, "owner": {"type": "string"}}
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "required": ["name", "client", "path", "score", "grade", "findings", "suppressed"],
+      "properties": {
+        "name": {"type": "string"}, "client": {"type": "string"}, "path": {"type": "string"},
+        "project": {"type": "string"},
+        "score": {"type": "integer", "minimum": 0, "maximum": 100},
+        "grade": {"enum": ["A", "B", "C", "D", "F"]},
+        "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+        "suppressed": {"type": "array", "items": {"$ref": "#/$defs/finding"}}
+      }
+    }
+  }
+}

@@ -114,6 +114,58 @@ def _empty_configs(configs: "list[dict] | None") -> "list[dict]":
     return [c for c in configs or [] if not c.get("servers")]
 
 
+CLAIMS = (
+    "What this report supports: on the date shown, this version of "
+    "mcp-gradecard found the findings listed in the configuration files and "
+    "tool lists named in it.",
+    "What it does not support: that any server is safe, secure or "
+    "compliant with a standard. It is not a certification, a penetration "
+    "test or a code review.",
+)
+
+
+def _report_id(results: list[dict]) -> str:
+    """A short fingerprint of what the report found: the same findings give
+    the same id, so two copies can be compared at a glance."""
+    import hashlib
+    from . import baseline
+    ids = sorted(f.get("id") or baseline.finding_id(r, f)
+                 for r in results for f in r["findings"])
+    return hashlib.sha256("\n".join(ids).encode()).hexdigest()[:12]
+
+
+def _inventory(results: list[dict]) -> "list[tuple[str, str, str]]":
+    """(server, client, what it launches or connects to) for every server,
+    from the config: packages with their pin state, remote hosts. Never
+    arguments or paths (they can hold secrets)."""
+    from . import detectors, supply
+    rows = []
+    for r in results:
+        cfg = r.get("config")
+        if not isinstance(cfg, dict) or cfg.get("toolFile"):
+            rows.append((str(r["name"]), str(r["client"]), "saved tool list"))
+            continue
+        parts = []
+        try:
+            for p in detectors._iter_packages(cfg):
+                if p.sure:
+                    parts.append(f"{p.ecosystem} {p.name} "
+                                 + (p.release() or "(not pinned)"))
+            hosts = sorted({h for _w, u in detectors.remote_urls(cfg)
+                            for h in [supply._host_only(u)] if h})
+            parts += [f"remote {h}" for h in hosts]
+        except Exception:                           # noqa: BLE001
+            parts.append("(could not be read)")
+        if not parts:
+            parts.append("local command")
+        rows.append((str(r["name"]), str(r["client"]), "; ".join(parts)))
+    return rows
+
+
+def _accepted(results: list[dict]) -> "list[tuple[dict, dict]]":
+    return [(r, f) for r in results for f in r.get("suppressed") or []]
+
+
 # -- HTML ---------------------------------------------------------------------
 
 def _h(text) -> str:
@@ -207,7 +259,9 @@ def _grade(grade: str, small: bool = False) -> str:
 def render_html(results: list[dict], warnings: "list[dict] | None" = None,
                 configs: "list[dict] | None" = None, version: str = "",
                 title: "str | None" = None, deep: bool = False,
-                generated: "str | None" = None) -> str:
+                generated: "str | None" = None,
+                prepared_by: "str | None" = None,
+                policy: "dict | None" = None) -> str:
     """A self-contained HTML report (inline styles, no scripts, no external
     resources)."""
     warnings = warnings or []
@@ -229,7 +283,10 @@ def render_html(results: list[dict], warnings: "list[dict] | None" = None,
     w(f"<h1>{_h(title)}</h1>")
     w(f'<div class="meta">Generated {_h(when)} by mcp-gradecard {_h(version)}'
       f" &middot; {n_configs} config file(s) &middot; {len(results)} "
-      f"server(s) &middot; {'static + live tool scan (--deep)' if deep else 'static audit'}</div>")
+      f"server(s) &middot; {'static + live tool scan (--deep)' if deep else 'static audit'}"
+      + (f" &middot; prepared by {_h(prepared_by)}"
+         if prepared_by and prepared_by.strip() else "")
+      + f" &middot; report id {_report_id(results)}</div>")
 
     # verdict
     w('<section class="card hero">')
@@ -309,6 +366,32 @@ def render_html(results: list[dict], warnings: "list[dict] | None" = None,
                 w(f'<p class="ok">{_h(deep_line or "No findings.")}</p>')
             w("</section>")
 
+    accepted = _accepted(results)
+    if accepted or (policy or {}).get("expired"):
+        w("<h2>Accepted findings</h2><section class=\"card\"><table>")
+        w("<tr><th>Server</th><th>Check</th><th>Reason</th><th>Until</th>"
+          "</tr>")
+        for r, f in accepted:
+            sup = f.get("suppression") or {}
+            w(f"<tr><td>{_h(r['name'])}</td><td>{_h(f['check'])}</td>"
+              f"<td class=\"msg\">{_h(sup.get('reason'))}</td>"
+              f"<td>{_h(sup.get('expires'))}</td></tr>")
+        w("</table><p class=\"meta\">These findings were accepted by the "
+          "owner of the configuration, each for a stated reason and until a "
+          "date; they are left out of the grades above.")
+        for e in (policy or {}).get("expired") or []:
+            w(f" A suppression of {_h(e['check'])} expired on "
+              f"{_h(e['expires'])} and no longer applies.")
+        w("</p></section>")
+
+    w("<h2>Inventory</h2><section class=\"card\"><table>")
+    w('<tr><th>Server</th><th class="hide">Client</th><th>Runs or connects '
+      "to</th></tr>")
+    for name, client, what in _inventory(results):
+        w(f"<tr><td>{_h(name)}</td><td class=\"hide\">{_h(client)}</td>"
+          f"<td class=\"msg\">{_h(what)}</td></tr>")
+    w("</table></section>")
+
     empty = _empty_configs(configs)
     if empty:
         w("<h2>Config files with no servers</h2><section class=\"card\">"
@@ -331,7 +414,7 @@ def render_html(results: list[dict], warnings: "list[dict] | None" = None,
 
     w("<h2>What this audit covers</h2><section class=\"card\">"
       '<ul class="plain">')
-    for line in LIMITS:
+    for line in LIMITS + CLAIMS:
         w(f"<li>{_h(line)}</li>")
     w("</ul></section>")
     w(f"<footer>mcp-gradecard {_h(version)} &middot; "
@@ -398,7 +481,9 @@ def render_markdown(results: list[dict],
                     warnings: "list[dict] | None" = None,
                     configs: "list[dict] | None" = None, version: str = "",
                     title: "str | None" = None, deep: bool = False,
-                    generated: "str | None" = None) -> str:
+                    generated: "str | None" = None,
+                    prepared_by: "str | None" = None,
+                    policy: "dict | None" = None) -> str:
     """The same report as render_html, in Markdown (a PR comment, a ticket,
     a wiki page)."""
     warnings = warnings or []
@@ -411,7 +496,10 @@ def render_markdown(results: list[dict],
              f"Generated {_m(when)} by mcp-gradecard {_m(version)} · "
              f"{n_configs} config file(s) · {len(results)} server(s) · "
              + ("static + live tool scan (--deep)" if deep
-                else "static audit"), "",
+                else "static audit")
+             + (f" · prepared by {_m(prepared_by)}"
+                if prepared_by and prepared_by.strip() else "")
+             + f" · report id {_report_id(results)}", "",
              (f"**Overall grade: {_worst_grade(results)}** "
               "(the lowest grade of any server)" if results
               else "**Overall grade: n/a** (no servers)"), "",
@@ -468,6 +556,27 @@ def render_markdown(results: list[dict],
                 lines += [f"- **{_m(catalog.title(c))}**: {_ours(t)}"
                           for c, t in remedies]
                 lines.append("")
+    accepted = _accepted(results)
+    if accepted or (policy or {}).get("expired"):
+        lines += ["## Accepted findings", "",
+                  "| Server | Check | Reason | Until |", "|---|---|---|---|"]
+        for r, f in accepted:
+            sup = f.get("suppression") or {}
+            lines.append(f"| {_mc(r['name'])} | {_m(f['check'])} | "
+                         f"{_m(sup.get('reason'))} | "
+                         f"{_m(sup.get('expires'))} |")
+        lines += ["", "Accepted by the owner of the configuration, each for "
+                  "a stated reason and until a date; left out of the "
+                  "grades above."]
+        for e in (policy or {}).get("expired") or []:
+            lines.append(f"A suppression of {_m(e['check'])} expired on "
+                         f"{_m(e['expires'])} and no longer applies.")
+        lines.append("")
+    lines += ["## Inventory", "", "| Server | Client | Runs or connects to |",
+              "|---|---|---|"]
+    lines += [f"| {_mc(n)} | {_mc(c)} | {_m(w)} |"
+              for n, c, w in _inventory(results)]
+    lines.append("")
     empty = _empty_configs(configs)
     if empty:
         lines += ["## Config files with no servers", ""]
@@ -480,7 +589,7 @@ def render_markdown(results: list[dict],
               "finding is evidence of; a zero means no finding of that kind, "
               f"not that the risk is absent. Source: {catalog.OWASP_URL} "
               "(beta).", "", "## What this audit covers", ""]
-    lines += [f"- {_m(line)}" for line in LIMITS]
+    lines += [f"- {_m(line)}" for line in LIMITS + CLAIMS]
     lines += ["", "Secrets found in configs are never printed in this "
               "report.", ""]
     return "\n".join(lines)

@@ -17,12 +17,16 @@ import traceback
 
 from . import __version__
 from . import deep as deep_mod
+from . import baseline as baseline_mod
+from . import catalog
 from . import detectors
 from . import discovery
 from . import launch
 from . import redact
 from . import report
 from . import scoring
+from . import supply
+from . import toolfile
 from . import toolset
 
 
@@ -717,15 +721,45 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="With --pins: after reporting the differences, "
                         "accept the tools as they are now.")
     p.add_argument("--format",
-                   choices=("human", "json", "sarif", "html", "markdown"),
+                   choices=("human", "json", "sarif", "html", "markdown", "cyclonedx"),
                    default="human",
                    help="human (default), json, sarif (GitHub code "
                         "scanning), html (a self-contained report to read "
                         "or hand over: no scripts, no external resources) "
                         "or markdown.")
     p.add_argument("--report-title", metavar="TEXT", default=None,
-                   help="With --format html or markdown: the title on the "
-                        "report (say, who it was prepared for).")
+                   help="With --format html, markdown or cyclonedx: the "
+                        "title on the report (say, who it was prepared for).")
+    p.add_argument("--prepared-by", metavar="TEXT", default=None,
+                   help="With --format html or markdown: who prepared the "
+                        "report (a name or a company), shown on its cover.")
+    p.add_argument("--advice", action="store_true",
+                   help="Under each finding of the terminal report, say what "
+                        "to do about it.")
+    p.add_argument("--explain", nargs="?", const="", default=None,
+                   metavar="CHECK",
+                   help="Explain one check in plain words (what to do, which "
+                        "OWASP MCP risk it belongs to, how to accept it) and "
+                        "stop; with no CHECK, list every check.")
+    p.add_argument("--tools-json", action="append", default=None,
+                   metavar="FILE",
+                   help="Audit a saved tools/list answer (repeatable) "
+                        "without launching anything: the same description "
+                        "scan, pins and shadowing check as --deep. Without "
+                        "--config, the machine's own configs are not read.")
+    p.add_argument("--baseline", metavar="FILE", default=None,
+                   help="Findings already in FILE (from --write-baseline) "
+                        "are marked known and do not trip --fail-on; only "
+                        "new ones do.")
+    p.add_argument("--write-baseline", metavar="FILE", default=None,
+                   help="Write today's findings to FILE and exit 0 "
+                        "(exit 2 if a config could not be audited).")
+    p.add_argument("--suppressions", metavar="FILE", default=None,
+                   help="A JSON file of accepted findings, each with a "
+                        "reason and an expiry date. A suppressed finding "
+                        "leaves the grade and the gate and stays listed; "
+                        "after its date it counts again. Never read unless "
+                        "named here.")
     p.add_argument("--fix", action="store_true",
                    help="List the servers launched via a downloader/shell or "
                         "curl|sh (critical suspicious-command / pipe-to-shell)"
@@ -747,6 +781,47 @@ def _build_parser() -> argparse.ArgumentParser:
                         "2 instead of passing if a config file could not be "
                         "audited (unparseable, too large...).")
     return p
+
+
+def _json_report(results: list, warnings: list, policy: dict) -> dict:
+    """The --format json document. Schema: schema/report.schema.json;
+    `schema_version` changes only when a field is removed or changes
+    meaning (adding fields does not change it)."""
+    def finding(f: dict) -> dict:
+        out = {k: v for k, v in f.items() if k != "suppression"}
+        out["title"] = catalog.title(f["check"])
+        out["owasp"] = list(catalog.owasp(f["check"]))
+        out["fix"] = catalog.remediation(f["check"])
+        if "suppression" in f:
+            out["suppression"] = f["suppression"]
+        return out
+
+    keys = ("name", "client", "path", "project", "score", "grade")
+    rows = []
+    for r in results:
+        row = {k: r[k] for k in keys if k in r}
+        row["findings"] = [finding(f) for f in r["findings"]]
+        row["suppressed"] = [finding(f) for f in r.get("suppressed") or []]
+        rows.append(row)
+    return {"schema_version": 1,
+            "tool": {"name": "mcp-gradecard", "version": __version__},
+            "results": rows, "summary": scoring.summarize(results),
+            "policy": policy, "warnings": warnings}
+
+
+def _explain(check: str) -> int:
+    if not check:
+        for name in sorted(catalog.CHECKS):
+            print(f"{name:28} {catalog.title(name)}")
+        print("\nmcp-gradecard --explain CHECK says more about one.")
+        return 0
+    text = catalog.explain(check)
+    if not text:
+        _note(f"error: no check called '{redact.sanitize(check)[:60]}'; "
+              "--explain alone lists them")
+        return 2
+    print(text)
+    return 0
 
 
 _SEV_RANK = {"low": 0, "medium": 1, "high": 2, "critical": 3}
@@ -956,15 +1031,39 @@ def _main(argv: list[str] | None) -> int:
         parser.error("--probe-critical only works together with --deep")
     if args.probe_project and not args.deep:
         parser.error("--probe-project only works together with --deep")
-    if args.pins and not args.deep:
-        parser.error("--pins only works together with --deep (pins are "
-                     "taken from the live tool lists)")
+    if args.pins and not (args.deep or args.tools_json):
+        parser.error("--pins only works together with --deep or "
+                     "--tools-json (pins are taken from tool lists)")
+    if args.baseline and args.write_baseline:
+        parser.error("--baseline and --write-baseline cannot be combined")
     if args.update_pins and not args.pins:
         parser.error("--update-pins only works together with --pins")
-    if args.report_title is not None and args.format not in ("html",
-                                                             "markdown"):
-        parser.error("--report-title only works with --format html or "
+    if args.report_title is not None and args.format not in (
+            "html", "markdown", "cyclonedx"):
+        parser.error("--report-title only works with --format html, "
+                     "markdown or cyclonedx")
+    if args.prepared_by is not None and args.format not in ("html",
+                                                            "markdown"):
+        parser.error("--prepared-by only works with --format html or "
                      "markdown")
+    if args.explain is not None:
+        return _explain(args.explain)
+    try:
+        suppressions = (baseline_mod.load_suppressions(args.suppressions)
+                        if args.suppressions else None)
+        known = (baseline_mod.load_baseline(args.baseline)
+                 if args.baseline else None)
+    except baseline_mod.PolicyError as e:
+        # A gate that cannot read its own policy must not pass.
+        _note(f"error: {e}")
+        return 2
+    tool_results: list[dict] = []
+    for path in args.tools_json or []:
+        try:
+            tool_results += toolfile.load(path)
+        except toolfile.ToolFileError as e:
+            _note(f"error: --tools-json '{path}': {e}")
+            return 2
     try:
         advisories = detectors.load_advisories()
     except detectors.AdvisoryFeedError as e:
@@ -977,7 +1076,10 @@ def _main(argv: list[str] | None) -> int:
             if err is not None:
                 _note(f"error: cannot read --config file '{path}': {err}")
                 return 2
-    discovered, warnings = discovery.discover(args.config)
+    if args.tools_json and not args.config:
+        discovered, warnings = [], []
+    else:
+        discovered, warnings = discovery.discover(args.config)
     if args.config and warnings:
         # Fail closed: an explicit --config that exists but can't be parsed
         # or understood must never report "clean" (exit 0).
@@ -987,7 +1089,8 @@ def _main(argv: list[str] | None) -> int:
         return 2
 
     allow_hosts = tuple(dict.fromkeys(args.allow_host))
-    results = _audit_all(discovered, advisories, args.online, allow_hosts)
+    results = _audit_all(discovered, advisories, args.online,
+                         allow_hosts) + tool_results
 
     fix_failed = False
     if args.fix:
@@ -996,10 +1099,14 @@ def _main(argv: list[str] | None) -> int:
             return stop
         # re-audit so the report reflects reality
         discovered, warnings = discovery.discover(args.config)
-        results = _audit_all(discovered, advisories, args.online, allow_hosts)
+        results = _audit_all(discovered, advisories, args.online,
+                             allow_hosts) + tool_results
 
     if args.deep:  # after --fix: once, and never a server --fix just removed
-        _deep_pass(results, args.probe_critical, args.probe_project)
+        from_files = {id(r) for r in tool_results}
+        _deep_pass([r for r in results if id(r) not in from_files],
+                   args.probe_critical, args.probe_project)
+    if args.deep or tool_results:
         try:
             _toolset_pass(results, args.pins, args.update_pins)
         except (toolset.PinsError, OSError) as e:
@@ -1010,37 +1117,64 @@ def _main(argv: list[str] | None) -> int:
             _note(f"error: --pins file '{args.pins}': {reason}")
             return 2
 
+    # Baseline and suppressions apply last: after every finding exists.
+    policy = baseline_mod.apply(results, suppressions, known)
+    for e in policy["expired"]:
+        _note(f"warning: a suppression of '{e['check']}' expired on "
+              f"{e['expires']}; the finding counts again")
+
     # Names, paths and project directories come from the config files: what
     # is printed has its control and bidi characters spelled out (sanitize),
     # whatever the format.
     if args.format == "sarif":
         print(json.dumps(redact.sanitize_tree(
-            scoring.render_sarif(results, __version__)), indent=2))
+            scoring.render_sarif(results, __version__,
+                                 baseline=known is not None)), indent=2))
+    elif args.format == "cyclonedx":
+        print(json.dumps(redact.sanitize_tree(
+            supply.render_cyclonedx(results, __version__,
+                                    args.report_title)), indent=2))
     elif args.format in ("html", "markdown"):
         render = (report.render_html if args.format == "html"
                   else report.render_markdown)
         print(render(results, warnings=warnings, configs=discovered,
                      version=__version__, title=args.report_title,
-                     deep=args.deep))
+                     deep=args.deep or bool(tool_results),
+                     prepared_by=args.prepared_by, policy=policy))
     elif args.format == "json":
-        out = {"results": [{k: r[k] for k in
-                            ("name", "client", "path", "project", "findings",
-                             "score", "grade") if k in r} for r in results],
-               "summary": scoring.summarize(results),
-               "warnings": warnings}
-        print(json.dumps(redact.sanitize_tree(out), indent=2))
+        print(json.dumps(redact.sanitize_tree(
+            _json_report(results, warnings, policy)), indent=2))
     if args.format != "human":
-        if args.format == "sarif":
+        if args.format in ("sarif", "cyclonedx"):
             for w in warnings:  # JSON carries these inline; SARIF can't
                 _note(f"warning: skipped {w['path']} <{w['client']}>: "
                       f"{w['reason']}")
-        if not discovered:
+        if not discovered and not tool_results:
             _note("warning: no MCP configs discovered — this is not a "
                   "clean bill of health")
     else:
         print(scoring.render_human(results, warnings=warnings,
-                                   n_configs=len(discovered),
-                                   configs=discovered))
+                                   n_configs=len(discovered) + len(
+                                       args.tools_json or ()),
+                                   configs=discovered, advice=args.advice,
+                                   policy=policy))
+
+    if args.write_baseline:
+        if warnings or fix_failed:
+            _note("error: --write-baseline: a config file could not be "
+                  "audited, so a baseline would hide what is in it")
+            return 2
+        try:
+            count = baseline_mod.write_baseline(args.write_baseline, results,
+                                                __version__)
+        except OSError as e:
+            _note(f"error: --write-baseline '{args.write_baseline}': "
+                  f"{e.strerror or type(e).__name__}")
+            return 2
+        _note(f"--write-baseline: {count} finding(s) written to "
+              f"{args.write_baseline}; later runs with --baseline report "
+              "only what is new")
+        return 0
 
     if fix_failed:
         return 2
@@ -1048,6 +1182,8 @@ def _main(argv: list[str] | None) -> int:
         threshold = _SEV_RANK[args.fail_on]
         for r in results:
             for f in r["findings"]:
+                if f.get("known"):
+                    continue    # in the baseline: already looked at
                 if _SEV_RANK.get(f["severity"], 0) >= threshold:
                     return 1
         if warnings:
