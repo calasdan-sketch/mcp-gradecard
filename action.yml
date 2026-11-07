@@ -1,0 +1,98 @@
+name: "MCP safety check"
+description: "Grade the MCP servers configured in a repository (A to F), upload SARIF to code scanning, and fail the job on new findings. Offline: nothing is sent anywhere."
+author: "Calas Automations"
+branding:
+  icon: shield
+  color: blue
+inputs:
+  config:
+    description: "Config files to audit, one per line (for example .mcp.json). Default: .mcp.json, .cursor/mcp.json and .vscode/mcp.json when they exist."
+    required: false
+    default: ""
+  tools-json:
+    description: "Saved tools/list answers to scan, one per line. Nothing is launched."
+    required: false
+    default: ""
+  fail-on:
+    description: "Fail the job when a new finding is at or above this severity: critical, high, medium or low. Empty: never fail on findings."
+    required: false
+    default: "high"
+  baseline:
+    description: "A baseline file written by --write-baseline. Only findings not in it fail the job."
+    required: false
+    default: ""
+  suppressions:
+    description: "A suppressions file (reason and expiry date per entry)."
+    required: false
+    default: ""
+  upload-sarif:
+    description: "Upload the SARIF report to GitHub code scanning (needs permissions: security-events: write)."
+    required: false
+    default: "true"
+  python-version:
+    description: "Python version to run with (3.10 or newer)."
+    required: false
+    default: "3.12"
+outputs:
+  report:
+    description: "Path of the Markdown report."
+    value: ${{ steps.run.outputs.report }}
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+    - name: Install mcp-gradecard from this action's own checkout
+      shell: bash
+      run: python -m pip install --quiet "$GITHUB_ACTION_PATH"
+    - name: Audit
+      id: run
+      shell: bash
+      env:
+        IN_CONFIG: ${{ inputs.config }}
+        IN_TOOLS: ${{ inputs.tools-json }}
+        IN_FAIL_ON: ${{ inputs.fail-on }}
+        IN_BASELINE: ${{ inputs.baseline }}
+        IN_SUPPRESSIONS: ${{ inputs.suppressions }}
+      run: |
+        set -u
+        args=()
+        if [ -z "$IN_CONFIG" ] && [ -z "$IN_TOOLS" ]; then
+          for f in .mcp.json .cursor/mcp.json .vscode/mcp.json; do
+            [ -f "$f" ] && args+=(--config "$f")
+          done
+          if [ ${#args[@]} -eq 0 ]; then
+            echo "No MCP config found in the repository (.mcp.json, .cursor/mcp.json, .vscode/mcp.json). Pass 'config' or 'tools-json'. This is not a clean bill of health." >&2
+            exit 2
+          fi
+        fi
+        while IFS= read -r line; do [ -n "$line" ] && args+=(--config "$line"); done <<< "$IN_CONFIG"
+        while IFS= read -r line; do [ -n "$line" ] && args+=(--tools-json "$line"); done <<< "$IN_TOOLS"
+        [ -n "$IN_BASELINE" ] && args+=(--baseline "$IN_BASELINE")
+        [ -n "$IN_SUPPRESSIONS" ] && args+=(--suppressions "$IN_SUPPRESSIONS")
+        out="${RUNNER_TEMP:-/tmp}/mcp-gradecard"
+        mkdir -p "$out"
+        # Reports first (never gate them), then one gating run.
+        mcp-gradecard "${args[@]}" --format sarif > "$out/results.sarif" || true
+        mcp-gradecard "${args[@]}" --format markdown > "$out/report.md" || true
+        cat "$out/report.md" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+        echo "report=$out/report.md" >> "$GITHUB_OUTPUT"
+        echo "sarif=$out/results.sarif" >> "$GITHUB_OUTPUT"
+        printf '%s\0' "${args[@]}" > "$out/args"
+        echo "args=$out/args" >> "$GITHUB_OUTPUT"
+    - name: Upload SARIF
+      if: ${{ inputs.upload-sarif == 'true' }}
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ steps.run.outputs.sarif }}
+        category: mcp-gradecard
+    - name: Gate
+      shell: bash
+      env:
+        IN_FAIL_ON: ${{ inputs.fail-on }}
+        ARGS_FILE: ${{ steps.run.outputs.args }}
+      run: |
+        [ -z "$IN_FAIL_ON" ] && exit 0
+        mapfile -d '' -t gate < "$ARGS_FILE"
+        mcp-gradecard "${gate[@]}" --fail-on "$IN_FAIL_ON" --format human

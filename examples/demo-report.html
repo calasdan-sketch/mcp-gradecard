@@ -61,7 +61,7 @@ a{color:inherit}
 @media (max-width:640px){th.hide,td.hide{display:none}}
 </style></head><body><main>
 <h1>MCP Safety Check: demo workstation</h1>
-<div class="meta">Generated 2026-11-05 22:19 UTC by mcp-gradecard 0.4.0 &middot; 1 config file(s) &middot; 4 server(s) &middot; static audit</div>
+<div class="meta">Generated 2026-11-07 09:47 UTC by mcp-gradecard 0.5.0 &middot; 1 config file(s) &middot; 4 server(s) &middot; static audit &middot; prepared by Calas Automations &middot; report id 21e7340d37e3</div>
 <section class="card hero">
 <div class="grade g-F" aria-label="grade F">F</div>
 <div>
@@ -136,6 +136,13 @@ a{color:inherit}
 <div><h3>filesystem <span class="meta">&lt;explicit&gt; &middot; 100/100</span></h3><div class="path">examples/demo-mcp.json</div></div></div>
 <p class="ok">No findings.</p>
 </section>
+<h2>Inventory</h2><section class="card"><table>
+<tr><th>Server</th><th class="hide">Client</th><th>Runs or connects to</th></tr>
+<tr><td>filesystem</td><td class="hide">explicit</td><td class="msg">npm @modelcontextprotocol/server-filesystem 2026.1.14</td></tr>
+<tr><td>github</td><td class="hide">explicit</td><td class="msg">npm @modelcontextprotocol/server-github (not pinned)</td></tr>
+<tr><td>vendor-crm</td><td class="hide">explicit</td><td class="msg">remote http://mcp.crm-vendor.example</td></tr>
+<tr><td>quick-setup</td><td class="hide">explicit</td><td class="msg">local command</td></tr>
+</table></section>
 <h2>OWASP MCP Top 10</h2><section class="card"><table>
 <tr><th>Risk</th><th>Findings</th></tr>
 <tr><td><span class="tag">MCP01</span> Token Mismanagement &amp; Secret Exposure</td><td>3</td></tr>
@@ -155,6 +162,8 @@ a{color:inherit}
 <li>Remote (http/sse) servers are judged by their configuration; their live tool lists are not fetched.</li>
 <li>Known-vulnerable packages are matched against the advisory feed built into this version (and OSV with --online); a package with no published advisory reads as clean.</li>
 <li>Nothing here reviews a server&#x27;s source code or what its tools do when called.</li>
+<li>What this report supports: on the date shown, this version of mcp-gradecard found the findings listed in the configuration files and tool lists named in it.</li>
+<li>What it does not support: that any server is safe, secure or compliant with a standard. It is not a certification, a penetration test or a code review.</li>
 </ul></section>
-<footer>mcp-gradecard 0.4.0 &middot; secrets found in configs are never printed in this report.</footer>
+<footer>mcp-gradecard 0.5.0 &middot; secrets found in configs are never printed in this report.</footer>
 </main></body></html>

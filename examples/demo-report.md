@@ -1,6 +1,6 @@
 # MCP Safety Check: demo workstation
 
-Generated 2026-11-05 22:19 UTC by mcp-gradecard 0.4.0 · 1 config file(s) · 4 server(s) · static audit
+Generated 2026-11-07 09:47 UTC by mcp-gradecard 0.5.0 · 1 config file(s) · 4 server(s) · static audit · prepared by Calas Automations · report id 21e7340d37e3
 
 **Overall grade: F** (the lowest grade of any server)
 
@@ -85,6 +85,15 @@ What to do:
 
 No findings.
 
+## Inventory
+
+| Server | Client | Runs or connects to |
+|---|---|---|
+| `filesystem` | `explicit` | npm @modelcontextprotocol/server-filesystem 2026.1.14 |
+| `github` | `explicit` | npm @modelcontextprotocol/server-github (not pinned) |
+| `vendor-crm` | `explicit` | remote http\[:\]//mcp.crm-vendor.example |
+| `quick-setup` | `explicit` | local command |
+
 ## OWASP MCP Top 10
 
 | Risk | Findings |
@@ -109,6 +118,8 @@ The mapping is mcp-gradecard's reading of which risk each finding is evidence of
 - Remote (http/sse) servers are judged by their configuration; their live tool lists are not fetched.
 - Known-vulnerable packages are matched against the advisory feed built into this version (and OSV with --online); a package with no published advisory reads as clean.
 - Nothing here reviews a server's source code or what its tools do when called.
+- What this report supports: on the date shown, this version of mcp-gradecard found the findings listed in the configuration files and tool lists named in it.
+- What it does not support: that any server is safe, secure or compliant with a standard. It is not a certification, a penetration test or a code review.
 
 Secrets found in configs are never printed in this report.
 

@@ -106,8 +106,10 @@ def load_suppressions(path: str, today: "datetime.date | None" = None
             raise PolicyError(f"{label}: \"reason\" is required (8 to 500 "
                               "characters): say why this is accepted")
         for key in ("server", "client", "contains", "owner"):
-            if key in item and not isinstance(item[key], str):
-                raise PolicyError(f"{label}: \"{key}\" must be text")
+            if key in item and (not isinstance(item[key], str)
+                                or len(item[key]) > 200):
+                raise PolicyError(f"{label}: \"{key}\" must be text of at "
+                                  "most 200 characters")
         expires = _date(item.get("expires"), "expires", label)
         if expires > today + datetime.timedelta(days=MAX_HORIZON_DAYS):
             raise PolicyError(f"{label}: \"expires\" is more than a year "

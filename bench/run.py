@@ -151,11 +151,25 @@ def main():
         print("  missed:", ", ".join(v["missed"]) or "none")
         print("  false positives:", ", ".join(v["false_positives"]) or "none")
     if a.cisco:
+        e_split = {e["id"]: e.get("split", "dev") for e in entries}
         fl = cisco(entries)
         crow = [{"id": e["id"], "label": e["label"], "class": e["class"], "flagged": fl[e["id"]],
                  "medium_plus": fl[e["id"]], "high_plus": fl[e["id"]]} for e in entries]
         print("\nCisco YARA analyzer, same corpus:")
         show(summary(crow))
+        # Cisco's analyzer reads one tool at a time: no pins, no other servers.
+        text = {"rug-pull", "rug-pull-control", "shadowing"}
+        print("\nText classes only (no rug-pull, no shadowing), dev and holdout together:")
+        for name, rs in (("mcp-gradecard", rows), ("Cisco YARA", crow)):
+            r = rates([x for x in rs if x["class"] not in text], "flagged")
+            print("  %-14s precision %.3f recall %.3f false-positive rate %.3f"
+                  % (name, r["precision"], r["recall"], r["false_positive_rate"]))
+        print("Holdout only:")
+        for name, rs in (("mcp-gradecard", rows), ("Cisco YARA", crow)):
+            r = rates([x for x in rs if x["class"] not in text
+                       and e_split[x["id"]] == "holdout"], "flagged")
+            print("  %-14s precision %.3f recall %.3f false-positive rate %.3f"
+                  % (name, r["precision"], r["recall"], r["false_positive_rate"]))
     if a.write:
         with open(os.path.join(HERE, "results.json"), "w", encoding="utf-8", newline="\n") as f:
             json.dump(s, f, indent=1, sort_keys=True)

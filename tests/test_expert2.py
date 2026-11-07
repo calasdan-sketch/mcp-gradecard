@@ -9,7 +9,7 @@ import unittest
 import unittest.mock
 
 from mcp_gradecard import baseline, catalog, discovery, supply
-from tests._support import (isolated_machine, private_tempdir, run_cli,
+from _support import (isolated_machine, private_tempdir, run_cli,
                             write_json, write_text)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -218,6 +218,45 @@ class TestSuppressions(Setup):
         res = [r for r in json.loads(out)["runs"][0]["results"] if "suppressions" in r]
         self.assertEqual(len(res), 1)
         self.assertEqual(res[0]["suppressions"][0]["kind"], "external")
+
+
+class TestHostilePolicy(Setup):
+    def test_control_and_bidi_characters_in_a_reason_never_reach_a_terminal_or_a_page(self):
+        reason = "fine\x1b[31mRED\u202eevil <script>alert(1)</script> \u2066x"
+        sup = self.sup([{"check": "floating-version", "reason": reason,
+                         "expires": "2027-02-01", "owner": "a\x07b"}])
+        for fmt in ("human", "json", "sarif", "html", "markdown"):
+            code, out, err = run_cli("--config", self.cfg, "--suppressions", sup,
+                                     "--format", fmt)
+            self.assertEqual(code, 0, (fmt, err))
+            for bad in ("\x1b", "\u202e", "\u2066", "\x07"):
+                self.assertNotIn(bad, out, (fmt, repr(bad)))
+            if fmt in ("html", "markdown"):
+                self.assertNotIn("<script>alert", out, fmt)
+
+    def test_a_secret_in_a_config_is_not_written_to_the_baseline(self):
+        secret = "ghp_" + "A1b2C3d4E5f6G7h8I9j0" * 2
+        cfg = write_json(self.path("s.json"), {"mcpServers": {"x": {
+            "command": "npx", "args": ["-y", "pkg@1.0.0"],
+            "env": {"GITHUB_TOKEN": secret}, "url": "https://h.example/x?token=" + secret}}})
+        base = self.path("b.json")
+        run_cli("--config", cfg, "--write-baseline", base)
+        with open(base, encoding="utf-8") as f:
+            self.assertNotIn(secret, f.read())
+
+    def test_overlong_patterns_are_refused(self):
+        sup = self.sup([{"check": "floating-version", "server": "a*" * 300,
+                         "reason": "long enough reason", "expires": "2027-01-01"}])
+        self.assertEqual(run_cli("--config", self.cfg, "--suppressions", sup)[0], 2)
+
+    def test_a_huge_baseline_is_refused_not_read(self):
+        big = self.path("big.json")
+        with open(big, "w", encoding="utf-8") as f:
+            f.write('{"schema": 1, "findings": [' + '{"id": "x"},' * 10 + '{"id":"y"}], "pad": "'
+                    + "a" * (baseline.MAX_FILE + 10) + '"}')
+        code, _o, err = run_cli("--config", self.cfg, "--baseline", big)
+        self.assertEqual(code, 2)
+        self.assertIn("larger", err)
 
 
 class TestToolFiles(Setup):
@@ -500,3 +539,31 @@ class TestBenchmark(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestActionFile(unittest.TestCase):
+    def setUp(self):
+        with open(os.path.join(ROOT, "action.yml"), encoding="utf-8") as f:
+            self.text = f.read()
+
+    def test_inputs_never_reach_a_shell_line_directly(self):
+        import re
+        # `${{ ... }}` inside a `run:` block would let an input become shell code
+        for block in re.findall(r"\n      run: \|\n((?:        .*\n?)+)", self.text):
+            self.assertNotIn("${{", block)
+
+    def test_every_option_it_passes_exists(self):
+        from mcp_gradecard import cli
+        known = set(cli._build_parser()._option_string_actions)
+        import re
+        lines = [ln for ln in self.text.splitlines() if "mcp-gradecard " in ln
+                 or "args+=(" in ln or "mcp-gradecard\"" in ln]
+        flags = set(re.findall(r"--[a-z][a-z-]+", "\n".join(lines)))
+        self.assertTrue(flags >= {"--config", "--tools-json", "--baseline", "--fail-on"})
+        for flag in flags:
+            self.assertIn(flag, known, flag)
+
+    def test_third_party_actions_are_named_with_a_version(self):
+        import re
+        for use in re.findall(r"uses: (\S+)", self.text):
+            self.assertRegex(use, r"@v\d+$")

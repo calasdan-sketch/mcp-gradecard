@@ -1,0 +1,92 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:f4f06669-066d-50c2-99e6-6435acc7fc47",
+  "version": 1,
+  "metadata": {
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "name": "mcp-gradecard",
+          "version": "0.5.0"
+        }
+      ]
+    },
+    "component": {
+      "type": "application",
+      "name": "demo workstation"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg-0-0",
+      "name": "@modelcontextprotocol/server-filesystem",
+      "version": "2026.1.14",
+      "purl": "pkg:npm/%40modelcontextprotocol/server-filesystem@2026.1.14",
+      "properties": [
+        {
+          "name": "mcp-gradecard:server",
+          "value": "filesystem"
+        },
+        {
+          "name": "mcp-gradecard:client",
+          "value": "explicit"
+        },
+        {
+          "name": "mcp-gradecard:pinned",
+          "value": "true"
+        },
+        {
+          "name": "mcp-gradecard:requested-version",
+          "value": "2026.1.14"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg-1-0",
+      "name": "@modelcontextprotocol/server-github",
+      "purl": "pkg:npm/%40modelcontextprotocol/server-github",
+      "properties": [
+        {
+          "name": "mcp-gradecard:server",
+          "value": "github"
+        },
+        {
+          "name": "mcp-gradecard:client",
+          "value": "explicit"
+        },
+        {
+          "name": "mcp-gradecard:pinned",
+          "value": "false"
+        },
+        {
+          "name": "mcp-gradecard:requested-version",
+          "value": ""
+        }
+      ]
+    }
+  ],
+  "services": [
+    {
+      "bom-ref": "svc-2",
+      "name": "vendor-crm",
+      "endpoints": [
+        "http://mcp.crm-vendor.example"
+      ],
+      "properties": [
+        {
+          "name": "mcp-gradecard:client",
+          "value": "explicit"
+        },
+        {
+          "name": "mcp-gradecard:grade",
+          "value": "D"
+        }
+      ]
+    }
+  ],
+  "dependencies": []
+}

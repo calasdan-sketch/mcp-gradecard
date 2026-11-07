@@ -47,7 +47,9 @@ A finished report for a small demo config is in
 ### How it compares
 
 Statements about other tools are taken from their own pages or a cited
-review, read on 2026-11-05; check them before you rely on them.
+review, read on 2026-11-05, plus, for Snyk Agent Scan 0.6.11 and Cisco's scanner
+4.8.7, their `--help` output and install size measured on 2026-11-07 (Snyk's
+analysis was not run: it needs an account). Check them before you rely on them.
 
 | | mcp-gradecard | [Snyk Agent Scan](https://pypi.org/project/snyk-agent-scan/) (was Invariant mcp-scan) | [Cisco MCP Scanner](https://pypi.org/project/cisco-ai-mcp-scanner/) | [mcp-audit (A. Dudley)](https://appsecsanta.com/mcp-audit) |
 |---|---|---|---|---|
@@ -59,6 +61,11 @@ review, read on 2026-11-05; check them before you rely on them.
 | Plain-http servers, tokens in URLs | yes | not listed | protocol probes on unauthenticated HTTP endpoints | credential patterns |
 | Reports | terminal, JSON, SARIF, HTML, Markdown | rich text, JSON | summary, table, JSON and more | terminal, JSON, SARIF, HTML, CycloneDX |
 | OWASP MCP Top 10 mapping | yes | not listed | AITech taxonomy | yes |
+| Audit a saved `tools/list` without launching anything | `--tools-json` | unverified (`inspect` exists; whether it launches was not tested) | `static --tools FILE` | unverified |
+| Gate only on new findings; accepted findings with reason and expiry | `--baseline`, `--suppressions` | `--ci`, `--ignore-risks`; neither baseline nor expiry listed in `--help` | not listed | unverified |
+| Bill of materials | CycloneDX 1.5 | not listed | not listed | CycloneDX |
+| Look-alike (typosquat) package names | yes, offline list | not listed | not listed | unverified |
+| Install size (measured: fresh venv, Python 3.13, Linux, 2026-11-07) | 0.9 MB, no dependencies | 96 MB (0.6.11) | 264 MB (4.8.7) | not measured |
 | Dependencies | none (stdlib) | Python package + Snyk service | Python 3.11+, several engines | Python package |
 
 Where others go further: Cisco's scanner can analyse server source code,
@@ -118,6 +125,29 @@ python3 -m mcp_gradecard --allow-host mcp.corp.example --allow-host '*.mirror.co
 
 # Also look up pinned npx/uvx packages in OSV (network; sends name+version)
 python3 -m mcp_gradecard --online
+
+# Add the gate to a team that already has findings: accept today's, fail only
+# on new ones (the id of a finding has no path in it, so a baseline written on
+# one machine matches on a CI runner)
+python3 -m mcp_gradecard --config .mcp.json --write-baseline .mcp-gradecard-baseline.json
+python3 -m mcp_gradecard --config .mcp.json --baseline .mcp-gradecard-baseline.json --fail-on high
+
+# Accept a finding for a while, with a reason and an expiry date (both
+# required); it leaves the grade and the gate, stays in the report, and
+# counts again after the date. Never read unless named.
+python3 -m mcp_gradecard --suppressions mcp-suppressions.json
+
+# Audit a saved tools/list answer without launching anything (a client or
+# vendor can send you one); --pins works on it too, so a changed tool is caught
+python3 -m mcp_gradecard --tools-json tools.json --fail-on high
+
+# A bill of materials (CycloneDX 1.5) of what the configs download and
+# connect to; pinned or not, hosts only (a URL's path or query may be a secret)
+python3 -m mcp_gradecard --format cyclonedx > mcp-bom.json
+
+# Say what to do under every finding, or explain one check
+python3 -m mcp_gradecard --advice
+python3 -m mcp_gradecard --explain floating-version
 
 # Print the version and stop
 python3 -m mcp_gradecard --version
@@ -744,6 +774,101 @@ them across the servers each client loads together (Claude Code's user,
 local, project and managed files count as one agent; Cursor and Claude
 Desktop are two). See `tool-shadowing` above.
 
+## Baselines, suppressions and the GitHub Action
+
+**Baseline.** `--write-baseline FILE` stores today's findings (id, server,
+client, check, severity and the message, which is already redacted) and exits
+`0`. Later runs with `--baseline FILE` still report every finding, marking the
+old ones `known`, but `--fail-on` counts only findings that are not in the
+file. `known` and the counts of new, known and fixed findings are in the JSON
+`policy` object; SARIF results carry `baselineState`. A run that could not
+audit a config file refuses to write a baseline (exit 2), so a baseline never
+hides what was not read. The id contains the client, the server name, the
+check and the message with its numbers taken out; it does not contain a path.
+
+**Suppressions.** A JSON file, `{"schema": 1, "suppressions": [...]}`; each
+entry has a `check` (see `--explain`), optionally a `server` and `client`
+(shell-style wildcards) and `contains` (text of the message), and must have a
+`reason` (8 to 500 characters) and an `expires` date (`YYYY-MM-DD`, at most a
+year ahead). A matching finding leaves the grade and `--fail-on`, and is listed
+in every format (human, JSON, SARIF `suppressions`, the HTML and Markdown
+"Accepted findings" table). After its date the finding counts again and the
+run says so on stderr. A file with a missing reason or date, a bad date, a
+misspelt field or an over-long pattern is refused with exit 2: a gate must not
+be switched off by a typo. The file is read only when `--suppressions` names
+it: a repository you clone cannot ship one that hides its own findings.
+
+**GitHub Action.** `action.yml` in this repository audits the repository's
+MCP configs, uploads SARIF to code scanning, writes the Markdown report to the
+job summary and fails the job at `fail-on` (default `high`):
+
+```yaml
+permissions: {contents: read, security-events: write}
+steps:
+  - uses: actions/checkout@v4
+  - uses: calasdan-sketch/mcp-gradecard@main   # pin a commit in real use
+    with:
+      config: .mcp.json
+      baseline: .mcp-gradecard-baseline.json
+```
+
+It installs mcp-gradecard from the action's own checkout (so the ref you pin
+is the code that runs), passes inputs through environment variables rather
+than into shell text, and sends nothing anywhere except the SARIF upload to
+GitHub. It has not been run on a hosted runner by the author; the steps were
+exercised locally and the file is checked by the test-suite.
+
+## JSON output
+
+`--format json` carries `schema_version` (1), the tool version, one object per
+server (with its `findings`, each with `id`, `title`, `owasp`, `fix` and, when
+a baseline or suppression applies, `known` or `suppression`), the `summary`,
+the `policy` counts and the `warnings`. The description of it is
+[`schema/report.schema.json`](schema/report.schema.json) (JSON Schema 2020-12);
+the test-suite validates real output against it. `schema_version` changes only
+when a field is removed or changes meaning; adding a field does not change it,
+so readers should ignore fields they do not know. 0.4.0's keys are all still
+there.
+
+## Benchmark: how well does the description scan work?
+
+`bench/` holds 234 invented MCP tool definitions (121 malicious across 13
+attack classes, 113 benign including look-alikes such as a security tool that
+quotes an attack), the script that builds them (`make_corpus.py`) and the one
+that measures the scan (`run.py`). Nothing in it is a working exploit; hosts
+are reserved example names. Re-run it with `python bench/run.py` (add `--write`
+to refresh `bench/results.json`; a test fails if the committed file is stale).
+
+Measured on 2026-11-07 (0.5.0; "any finding" means at least one finding of
+any severity on that tool):
+
+| | malicious | benign | recall | precision | false-positive rate |
+|---|---|---|---|---|---|
+| 0.4.0 scanner, whole corpus | 121 | 113 | 0.744 | 0.968 | 0.027 |
+| 0.5.0 scanner, whole corpus | 121 | 113 | 0.876 | 0.972 | 0.027 |
+| 0.5.0, **holdout** (never used to tune) | 37 | 28 | 0.730 | 0.964 | 0.036 |
+| 0.5.0, dev set (used to tune) | 84 | 85 | 0.940 | 0.975 | 0.024 |
+
+Read the holdout row. The dev entries were written first, the scanner was
+then extended to catch what it missed on them (approval bypass, credential
+relay, priority claims, a persona jailbreak, Japanese and Korean), and the
+holdout was written afterwards in fresh wording; the holdout moved from 0.676
+to 0.730 recall under those changes. The corpus is the author's, so it
+favours the author's scanner: it shows what the scan catches and where it
+does not (paraphrase and euphemism are the weakest class, 2 of 8), not how it
+does on attacks nobody here thought of. At "high or higher" the whole-corpus
+recall is 0.661. Rug-pull (pinned definition changed) and tool-shadowing are
+checked by hash and by name, 8 of 8 and 10 of 10, with no false alarm on
+re-listed tools.
+
+The same tool definitions through Cisco's offline YARA analyzer
+(`cisco-ai-mcp-scanner` 4.8.7, one tool at a time; its LLM, API and
+VirusTotal engines need keys and were not run), on the text classes only (it
+has no pins and sees one server): recall 0.320, false-positive rate 0.028,
+against 0.854 and 0.028 for mcp-gradecard; on the holdout 0.250 against 0.688.
+This is one engine of that product on a corpus written for this one: it is
+not a verdict on the product.
+
 ## Reports and OWASP MCP Top 10
 
 `--format html` writes one self-contained page: inline styles only, no
@@ -755,7 +880,13 @@ give each server its findings, what to do about each kind, and the [OWASP
 MCP Top 10](https://owasp.org/www-project-mcp-top-10/) risks they are
 evidence of, and end with what the audit does not cover. Every name, path and
 message from a config or a server is sanitized and escaped, so a hostile
-server name cannot inject markup. `--report-title` sets the heading.
+server name cannot inject markup. `--report-title` sets the heading and
+`--prepared-by` names who prepared it. They also carry a report id (the same
+findings give the same id), an inventory of what each server runs or connects to
+(packages with their pin state, remote hosts; never arguments), the accepted
+(suppressed) findings with reasons and dates, and a plain statement of what the
+report does and does not support. See
+[docs/safety-check.md](docs/safety-check.md) for using it as a paid service.
 
 The mapping from checks to OWASP risks lives in `mcp_gradecard/catalog.py`;
 it is this project's reading, not OWASP's, and OWASP's list is still beta.
@@ -809,6 +940,7 @@ Python SDK — `--online` reports those by version.)
 ```bash
 python3 -m unittest discover -s tests -v
 python -m pytest -q                        # same suite
+python bench/run.py                        # the description-scan benchmark
 ```
 
 The suite is hermetic: it works in temporary directories (a fake home via
@@ -826,6 +958,21 @@ reason, when the interpreter cannot build a wheel at all).
 ## Limitations
 
 What mcp-gradecard does not do, so that you do not find out the hard way:
+
+**New in 0.5.0**
+
+- The description scan is a pattern reader with a measured recall of 0.73 on
+  attacks written after it was tuned (see the benchmark): paraphrase and
+  euphemism get through, and a tool that quotes an attack can be flagged.
+- `typosquat` compares names with a short built-in list of popular packages;
+  it knows nothing of who published a package or when. A new look-alike of a
+  package that is not on the list is not seen.
+- The CycloneDX document lists what the configs would download, not what was
+  installed: no hashes, and an unpinned package has no version.
+- Config locations marked **unverified** in the discovery table (Codex, Amazon
+  Q, LM Studio, Cline, Roo Code, WSL, the Microsoft Store package of Claude
+  Desktop) come from memory or user reports, not from the clients' pages.
+- The GitHub Action has not been run on a hosted runner.
 
 **Reading configs**
 

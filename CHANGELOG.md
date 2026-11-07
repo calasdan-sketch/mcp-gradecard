@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.0 (unreleased)
+
+- Benchmark: `bench/` holds 234 invented tool definitions (121 malicious in 13 classes, 113 benign) with a dev and a frozen holdout split, a generator, a runner and committed results; a test fails when the files are stale. Recall of the description scan on the whole corpus went from 0.744 to 0.876 at the same false-positive rate (0.027); on the holdout it is 0.730 (was 0.676).
+- Description scan: new signals for an order not to ask for approval (`no_consent`), credentials handed to another tool or server (`relay`), moving a user's private data (`user_secrets`), more claims of priority over the user, a persona jailbreak, "do not mention it", and Japanese and Korean overrides.
+- `--baseline FILE` / `--write-baseline FILE`: the gate counts only findings that are not in the baseline; findings carry a path-free `id` and `known`. SARIF results carry `baselineState`.
+- `--suppressions FILE`: accepted findings with a required reason and expiry date; they leave the grade and the gate, stay listed in every format (SARIF `suppressions`), and count again after their date. A bad file exits 2. Never read unless named.
+- `--tools-json FILE`: scan a saved tools/list answer without launching anything; `--pins` works on it. `deep.normalize_tool` is shared with the live probe.
+- `--format cyclonedx`: a CycloneDX 1.5 bill of materials of packages (purl, pin state) and remote services (host only).
+- New check `typosquat`: a package name one character, one separator or one look-alike away from a well-known MCP package, or under a scope that imitates an official one. Offline list; medium.
+- `--explain [CHECK]` and `--advice`: plain-language explanation of a check, and a fix line under each finding in the terminal report.
+- `--format json` now has `schema_version` 1, a `policy` object, and per finding `id`, `title`, `owasp`, `fix`; described by `schema/report.schema.json`. Old keys are unchanged.
+- Reports: `--prepared-by`, a report id, an inventory of what each server runs or connects to, an "Accepted findings" table, and a statement of what the report does and does not support. `docs/safety-check.md` describes using it as a paid service.
+- `action.yml`: a composite GitHub Action (audit, SARIF upload, job summary, gate).
+- Discovery: Gemini CLI (documented), Codex CLI (TOML), Amazon Q, LM Studio, Cline, Roo Code, the Microsoft Store package of Claude Desktop, and Windows-side configs when running in WSL (all but Gemini marked unverified in the README). A TOML file on Python 3.10 is a warning, not a skip.
+- Behaviour changes: findings of the new description signals and `typosquat` can lower a grade that was higher in 0.4.0.
+
 ## 0.4.0 (unreleased)
 
 - New report formats: `--format html` (one self-contained page: no scripts, nothing loaded from the network, a Content-Security-Policy, light/dark and print layouts) and `--format markdown`. Both give the overall grade, what to fix first, per-server findings with what to do about each, the OWASP MCP Top 10 risks they map to, and what the audit does not cover. `--report-title` sets the heading. Untrusted names and messages are sanitized and escaped.
