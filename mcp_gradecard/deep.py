@@ -438,6 +438,30 @@ def _server_texts(result) -> dict:
     return found
 
 
+def normalize_tool(tool: dict) -> dict:
+    """One tool object as `tools/list` sends it -> the entry the scanners
+    read (name, description, title, schema texts, digest). Shared by the
+    live probe and by --tools-json, so a saved tool list is judged exactly
+    as a live one."""
+    entry = {"name": _text(tool.get("name")),
+             "description": _text(tool.get("description"))}
+    if isinstance(tool.get("title"), str) and tool["title"]:
+        entry["title"] = tool["title"]
+    annotations = tool.get("annotations")
+    if isinstance(annotations, dict) and isinstance(
+            annotations.get("title"), str) \
+            and annotations["title"].strip():
+        entry["annotations_title"] = annotations["title"]
+    parameters = _parameters(tool.get("inputSchema"))
+    if parameters:
+        entry["parameters"] = parameters
+    outputs = _parameters(tool.get("outputSchema"))
+    if outputs:
+        entry["outputs"] = outputs
+    entry["digest"] = tool_digest(tool)
+    return entry
+
+
 def _converse(proc, reader: _Reader, deadline: float, timeout: float) -> dict:
     """The handshake and tools/list on a running server."""
     _send(proc, {"jsonrpc": "2.0", "id": 1, "method": "initialize",
@@ -471,23 +495,7 @@ def _converse(proc, reader: _Reader, deadline: float, timeout: float) -> dict:
                 note = f"only the first {MAX_TOOLS} tools were scanned"
                 break
             if isinstance(tool, dict):
-                entry = {"name": _text(tool.get("name")),
-                         "description": _text(tool.get("description"))}
-                if isinstance(tool.get("title"), str) and tool["title"]:
-                    entry["title"] = tool["title"]
-                annotations = tool.get("annotations")
-                if isinstance(annotations, dict) and isinstance(
-                        annotations.get("title"), str) \
-                        and annotations["title"].strip():
-                    entry["annotations_title"] = annotations["title"]
-                parameters = _parameters(tool.get("inputSchema"))
-                if parameters:
-                    entry["parameters"] = parameters
-                outputs = _parameters(tool.get("outputSchema"))
-                if outputs:
-                    entry["outputs"] = outputs
-                entry["digest"] = tool_digest(tool)
-                tools.append(entry)
+                tools.append(normalize_tool(tool))
             else:  # not a tool object: still scan whatever it says
                 tools.append({"name": "", "description": _text(tool)})
         cursor = result.get("nextCursor")

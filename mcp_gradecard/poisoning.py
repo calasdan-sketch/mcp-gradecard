@@ -485,6 +485,16 @@ _O_NON_LATIN = (
                r"\u043a\u0446\u0438|\u0443\u043a\u0430\u0437\u0430\u043d\u0438|"
                r"\u043f\u0440\u0430\u0432\u0438\u043b|\u043a\u043e\u043c\u0430"
                r"\u043d\u0434)\w*"),
+    # Japanese: ignore the previous / all instructions
+    re.compile(r"(?:\u4ee5\u524d|\u524d\u306e|\u4e0a\u8a18|\u3059\u3079"
+               r"\u3066)\u306e?(?:\u6307\u793a|\u547d\u4ee4|\u30eb\u30fc"
+               r"\u30eb|\u6307\u4ee4)[\u3092\u306f]?(?:\u3059\u3079"
+               r"\u3066)?(?:\u5b8c\u5168\u306b)?(?:\u7121\u8996|\u5fd8"
+               r"\u308c)(?!\u3057\u306a\u3044\u3067)"),
+    # Korean: ignore the previous instructions
+    re.compile(r"(?:\uc774\uc804|\uc704)\uc758? ?(?:\ubaa8\ub4e0 )?"
+               r"(?:\uc9c0\uc2dc|\uc9c0\uce68|\uba85\ub839)\ub97c? "
+               r"?\ubb34\uc2dc"),
     # Chinese: ignore the previous / all instructions
     re.compile(r"(?:\u5ffd\u7565|\u65e0\u89c6|\u5ffd\u89c6|\u4e0d\u8981"
                r"\u7406\u4f1a)(?:\u4e4b\u524d|\u5148\u524d|\u4ee5\u524d|"
@@ -539,6 +549,9 @@ _C_OTHER = (
                r"acknowledg(?:e|ing)|talk about|discuss|refer to|point out|"
                r"admit|confirm) (?:that|this|about|the fact|these|those|any of "
                r"this|what|how|why)\b" % _NOT),
+    re.compile(r"\b(?:do not|don't|dont|never) (?:mention|reveal|disclose|"
+               r"tell|say anything about) (?:it|this|that|them)(?: to (?:the "
+               r")?(?:user|human|person))?(?:[.!,;)]|$)"),
     re.compile(r"\b(?:hidden|invisible|concealed|secret) (?:from|to) "
                r"(?:the )?(?:user|human|person)\b"),
     re.compile(r"\b(?:not|never) (?:be )?(?:visible|shown|displayed|seen|"
@@ -749,7 +762,72 @@ _HIJACK = re.compile("|".join((
     r"jailbreak|jailbroken|unrestricted) mode\b",
     r"\bdo anything now\b",
     r"\b(?:do not|never) use (?:any )?other tools?\b",
+    # claims of priority over the user
+    r"\btakes? (?:precedence|priority) over (?:what |anything )?(?:the |any "
+    r"|all )?(?:user|human|person|system|operator)",
+    r"\b(?:higher|greater|top|highest) priority than (?:the |any |all )?"
+    r"(?:user|human|person|system|operator)",
+    r"\b(?:obey|follow) (?:this|these|the) (?:tool|text|description|"
+    r"instructions?|rules)(?: \w+){0,2} (?:over|before|instead of|rather "
+    r"than) (?:the |any )?(?:user|human|person|system)",
+    r"\b(?:ignor\w+|disregard\w*) (?:what|anything|everything|whatever) "
+    r"(?:the )?(?:user|human|person) (?:said|says|asked|asks|wants|wrote)",
+    r"\b(?:the )?(?:user|human|person)(?:'s|s)? (?:request|wishes|"
+    r"instructions?|message) (?:does not|doesn't|do not|don't) matter\b",
+    r"\b(?:override|overrides|overriding|supersed\w+|trump\w*) "
+    r"(?:anything|everything|whatever|all|any)(?: \w+){0,3} (?:the |any )?"
+    r"(?:user|human|system prompt|operator)",
+    r"\byou are (?:now )?dan\b", r"\ban? (?:assistant|ai|model) without "
+    r"(?:any )?(?:rules|restrictions|limits|limitations|guidelines|filters)",
 )))
+
+# the human gate removed: an order not to ask for approval
+_NO_CONSENT = re.compile("|".join((
+    r"\b(?:do not|don't|dont|never|no need to|must not|should not|stop) "
+    r"(?:ask|asking|seek|request|prompt|wait)(?: \w+){0,3} (?:for |to "
+    r"|before )?(?:any |the |their |user |your )*(?:confirmation|approval|"
+    r"permission|consent|authori[sz]ation|go-ahead|sign-off)",
+    r"\b(?:skip|bypass|disable|suppress|circumvent|override|avoid|omit)"
+    r"(?:s|ing)? (?:every |all |any |the |each )*(?:\w+ ){0,2}"
+    r"(?:confirmation|approval|permission|consent)(?: \w+)? ?"
+    r"(?:prompts?|dialogs?|dialogues?|checks?|steps?|requests?|windows?)?",
+    r"\b(?:pre-?approved|already (?:been )?(?:approved|authori[sz]ed|"
+    r"confirmed)|(?:user|operator|owner) has (?:already )?(?:approved|"
+    r"authori[sz]ed|consented)|has (?:been )?(?:approved|authori[sz]ed) "
+    r"(?:in advance|beforehand))\b",
+    r"\bauto[_-]?(?:approve|confirm|accept|allow)\b[^.]{0,40}\btrue\b",
+    r"\bso (?:that )?(?:the )?(?:user|human|person) is not (?:asked|"
+    r"prompted|bothered)",
+)))
+
+# credentials moved from one place to another: the confused deputy
+_CRED = (r"(?:(?:oauth|access|bearer|api|auth(?:entication)?|session|refresh"
+         r"|login|admin) )?(?:tokens?|cookies?|credentials?|passwords?|"
+         r"api keys?|secrets?|sessions?)")
+_RELAY = re.compile("|".join((
+    r"\b(?:forward|relay|hand over|hand|pass|give|send|share|supply|use|"
+    r"provide|copy|put|paste|include)\b(?: \S+){0,3} (?:the |your |any |all "
+    r")?(?:user'?s? )?%s\b(?: \S+){0,6} (?:returned by|issued by|obtained "
+    r"from|retrieved from|produced by|from (?:the |your )?(?:other|another)|"
+    r"you (?:hold|have|got|obtained|received)|held by|for (?:your )?other "
+    r"tools?)" % _CRED,
+    r"\b(?:forward|relay|hand over|pass|give|send|share|supply|provide|copy|"
+    r"paste)\b(?: \S+){0,3} (?:the |your |any |all )?(?:user'?s? )?%s\b"
+    r"(?: \S+){0,10} (?:to|into) (?:this|that|the) (?:tool|server|function)"
+    r"(?:'s|s)?\b" % _CRED,
+    r"\buses? the user'?s? (?:already[- ])?(?:authenticated|logged[- ]in|"
+    r"signed[- ]in) (?:session|account|login)",
+)))
+
+# what a user keeps private, moved by an order
+_USER_SECRETS = re.compile(
+    r"\b(?:read|copy|put|paste|include|attach|send|upload|forward|collect|"
+    r"gather|grab|extract|export|append)\b(?: \S+){0,6} (?:the |all |their "
+    r"|every |any )*(?:user'?s?|their|victim'?s?) (?:\w+ ){0,2}(?:ssh "
+    r"(?:private )?keys?|private keys?|browser cookies|saved passwords?|"
+    r"passwords?|cookies|api keys?|auth tokens?|access tokens?|credentials|"
+    r"secrets|home directory|wallet|seed phrase)\b")
+
 
 
 def _negated(view: str, start: int) -> bool:
@@ -899,6 +977,13 @@ def _signals(view: str, raw: str) -> set:
         found.add("tag")
     if _HIJACK.search(view):
         found.add("hijack")
+    if _NO_CONSENT.search(view):
+        found.add("no_consent")
+    if _RELAY.search(view):
+        found.add("relay")
+    if _USER_SECRETS.search(view) and not _NOT_READ.search(
+            view, 0, _USER_SECRETS.search(view).start()):
+        found.add("user_secrets")
     if "<!--" in view:
         found.add("comment")
     return found
@@ -923,13 +1008,20 @@ _LABELS = {
     "prompt_leak": "tells the agent to hand over its own instructions",
     "tag": "uses a fake system or instruction tag",
     "hijack": "claims priority over the user or over other tools",
+    "no_consent": "tells the agent not to ask the user for approval or "
+                  "confirmation",
+    "relay": "tells the agent to hand credentials it holds to a tool or "
+             "another server",
+    "user_secrets": "tells the agent to move the user's private data "
+                    "(keys, passwords, cookies)",
     "comment": "contains an HTML comment (not shown when rendered)",
     "encoded": "contains encoded text",
     "blob": "contains a long base64-looking string",
 }
 _ORDER = ("override", "conceal", "read_sensitive", "contents", "sensitive",
           "read_weak", "carry_param", "send_data", "url_data", "run_remote",
-          "prompt_leak", "tag", "hijack", "hidden", "comment", "encoded",
+          "prompt_leak", "tag", "hijack", "no_consent", "relay",
+          "user_secrets", "hidden", "comment", "encoded",
           "blob", "truncated")
 #: A signal whose label already says what these say.
 _INCLUDES = {"read_sensitive": {"contents", "sensitive", "read_weak"},
@@ -968,15 +1060,22 @@ def _severity(s: set):
         return "critical"
     if "send_data" in s and "hijack" in s:
         return "critical"
+    if "user_secrets" in s and (carry or s & {"conceal", "tag", "hijack",
+                                              "obligation", "no_consent"}):
+        return "critical"
+    if "no_consent" in s and s & {"conceal", "tag", "hijack", "relay",
+                                  "sensitive", "read_sensitive"}:
+        return "critical"
     if s & {"run_remote", "prompt_leak"} and (
             carry or s & _STAGED or {"run_remote", "prompt_leak"} <= s):
         return "critical"
-    if s & {"conceal", "hidden", "url_data", "read_sensitive", "prompt_leak"}:
+    if s & {"conceal", "hidden", "url_data", "read_sensitive", "prompt_leak",
+            "no_consent", "relay"}:
         return "high"
     if "read_weak" in s and carry:
         return "high"
     if s & {"send_data", "run_remote", "contents", "tag", "hijack", "comment",
-            "encoded", "truncated"}:
+            "encoded", "truncated", "user_secrets"}:
         return "medium"
     if "blob" in s:
         return "low"
