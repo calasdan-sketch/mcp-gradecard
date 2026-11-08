@@ -1,0 +1,55 @@
+
+── mcp-gradecard ───────────────────────────────────────
+
+  [F] quick-setup  (0/100)  <demo>
+        (built-in demo - not your machine)
+        [CRITICAL] server runs 'curl' inside 'bash' — a downloader/shell, not a server binary
+            fix: Replace the entry with a pinned package (npx pkg@1.2.3, uvx pkg==1.2.3) or a local
+                 binary you have reviewed. `--fix --remove` can delete it.
+        [CRITICAL] command pipes content into a shell (classic curl|sh pattern)
+            fix: Never run `curl ... | sh` from an MCP config: download, review and pin the script,
+                 or install the server from a package registry. `--fix --remove` can delete it.
+        [CRITICAL] remote endpoint in args: https://get.tools.example/...
+            fix: Confirm the host is one you expect this server to talk to. If it is yours, trust it
+                 with `--allow-host`; if not, remove the server.
+
+  [D] vendor-crm  (50/100)  <demo>
+        (built-in demo - not your machine)
+        [HIGH    ] remote MCP server in 'url' is reached over plain http:// (no TLS): anyone on the network path can read its traffic, including any token, and rewrite the tool descriptions your agent reads; use https://
+            fix: Use the server's https:// (or wss://) URL. Over plain http anyone on the network can
+                 read tokens and rewrite tool descriptions.
+        [HIGH    ] credential written into a URL in 'url' (api_key): URLs are kept in logs, proxies and shell history; keeping credentials out of URLs is standard practice. Send it in an Authorization header that references an environment variable
+            fix: Rotate the credential, remove it from the URL and send it in an Authorization header
+                 that references an environment variable ("Bearer ${TOKEN}"), or use the server's
+                 OAuth sign-in.
+        [MEDIUM  ] remote MCP server URL (traffic leaves the machine): http://mcp.crm-vendor.example/...
+            fix: Check you trust the operator with everything your agent will send. Trust a host of
+                 your own with `--allow-host`.
+
+  [B] github  (75/100)  <demo>
+        (built-in demo - not your machine)
+        [MEDIUM  ] unpinned package '@modelcontextprotocol/server-github' — every launch can pull a different (possibly compromised) release; pin with @modelcontextprotocol/server-github@x.y.z
+            fix: Pin an exact version (pkg@1.2.3 / pkg==1.2.3) so a compromised release cannot reach
+                 you on the next launch.
+        [MEDIUM  ] server receives secrets via env: GITHUB_PERSONAL_ACCESS_TOKEN — a compromised server leaks these
+            fix: Give the server a token with the narrowest scope and shortest life that works, and
+                 only to servers you trust.
+        [LOW     ] credential stored in plain text in the config file: env GITHUB_PERSONAL_ACCESS_TOKEN — anything that can read this file has it; keep it in your OS keychain or shell environment and reference it
+            fix: Move the value to your OS keychain or shell environment and reference it ("${TOKEN}"
+                 where the client supports it). In a project file: rotate it and make sure the file
+                 is not committed.
+
+  [A] filesystem  (100/100)  <demo>
+        (built-in demo - not your machine)
+        ✓ no findings
+
+  4 servers · 9 findings (crit=3 high=2 med=3 low=1)
+
+  Overall: F  —  3 critical finding(s): act on these before you use these servers again.
+  Fix first:
+    1. quick-setup [F]: server runs 'curl' inside 'bash'  (+2 more serious)
+    2. vendor-crm [D]: remote MCP server in 'url' is reached over plain http:// (no TLS)  (+1 more serious)
+  Next:
+    mcp-gradecard --format html -o report.html  a report you can hand over
+    mcp-gradecard --deep                        also read what servers say about their tools (launches them)
+──────────────────────────────────────────────────

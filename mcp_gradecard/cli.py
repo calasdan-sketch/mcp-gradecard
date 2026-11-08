@@ -666,6 +666,7 @@ exit codes:
 
 Nothing is sent anywhere unless you give --online. --deep launches servers
 (it lists them first). Docs: https://github.com/calasdan-sketch/mcp-gradecard
+mcp-gradecard is made and maintained by Calas Automations Inc.
 """
 
 
@@ -756,6 +757,19 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--prepared-by", metavar="TEXT", default=None,
                    help="With --format html or markdown: who prepared the "
                         "report (a name or a company), shown on its cover.")
+    p.add_argument("--client", metavar="NAME", default=None,
+                   help="With --format html or markdown: who the report is "
+                        "for (a one-off paid check). Shown under Scope and "
+                        "method and, unless --report-title is given, in the "
+                        "title.")
+    p.add_argument("--scope-note", metavar="TEXT", default=None,
+                   help="With --format html or markdown: one sentence on "
+                        "what was agreed to be in scope (say, \"the "
+                        "configs of three laptops; nothing launched\").")
+    p.add_argument("--reviewed-by", metavar="NAME", default=None,
+                   help="With --format html or markdown: the person who "
+                        "read every critical and high finding before the "
+                        "report went out. Only say so if it is true.")
     p.add_argument("-o", "--output", metavar="FILE", default=None,
                    help="Write the report to FILE (UTF-8) instead of "
                         "printing it. Safer than `> file` on Windows, where "
@@ -1161,6 +1175,17 @@ def _main(argv: list[str] | None) -> int:
                                                             "markdown"):
         parser.error("--prepared-by only works with --format html or "
                      "markdown")
+    for flag, used in (("--client", args.client),
+                       ("--scope-note", args.scope_note),
+                       ("--reviewed-by", args.reviewed_by)):
+        if used is not None and args.format not in ("html", "markdown"):
+            parser.error(f"{flag} only works with --format html or markdown")
+        if used is not None and len(used) > 400:
+            parser.error(f"{flag} is longer than 400 characters")
+    if args.client and args.client.strip() and args.report_title is None \
+            and args.format in (
+            "html", "markdown"):
+        args.report_title = f"MCP Safety Check: {args.client.strip()}"
     if args.demo:
         for flag, used in (("--config", args.config),
                            ("--tools-json", args.tools_json),
@@ -1279,7 +1304,10 @@ def _main(argv: list[str] | None) -> int:
         text = render(results, warnings=warnings, configs=discovered,
                       version=__version__, title=args.report_title,
                       deep=deep_used, prepared_by=args.prepared_by,
-                      policy=policy, comparison=comparison)
+                      policy=policy, comparison=comparison,
+                      client=args.client, scope_note=args.scope_note,
+                      reviewed_by=args.reviewed_by, online=args.online,
+                      n_advisories=len(advisories))
     elif args.format == "json":
         text = json.dumps(redact.sanitize_tree(
             _json_report(results, warnings, policy, deep_used, comparison)),

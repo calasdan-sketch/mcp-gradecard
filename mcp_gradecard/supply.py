@@ -235,6 +235,7 @@ def render_cyclonedx(results: "list[dict]", version: str,
         "metadata": {
             "tools": {"components": [{"type": "application",
                                       "name": "mcp-gradecard",
+                                      "author": "Calas Automations Inc.",
                                       "version": version}]},
             "component": {"type": "application",
                           "name": title or "MCP agent configuration"}},

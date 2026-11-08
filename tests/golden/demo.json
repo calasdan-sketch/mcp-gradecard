@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "mcp-gradecard",
+    "version": "VERSION"
+  },
+  "results": [
+    {
+      "name": "filesystem",
+      "client": "demo",
+      "path": "(built-in demo - not your machine)",
+      "score": 100,
+      "grade": "A",
+      "findings": [],
+      "suppressed": []
+    },
+    {
+      "name": "github",
+      "client": "demo",
+      "path": "(built-in demo - not your machine)",
+      "score": 75,
+      "grade": "B",
+      "findings": [
+        {
+          "severity": "medium",
+          "check": "floating-version",
+          "message": "unpinned package '@modelcontextprotocol/server-github' \u2014 every launch can pull a different (possibly compromised) release; pin with @modelcontextprotocol/server-github@x.y.z",
+          "id": "e8e1bffd43f66db7e6b972b67f9dbd56",
+          "title": "Package version not pinned",
+          "owasp": [
+            "MCP04"
+          ],
+          "fix": "Pin an exact version (pkg@1.2.3 / pkg==1.2.3) so a compromised release cannot reach you on the next launch."
+        },
+        {
+          "severity": "medium",
+          "check": "secret-env",
+          "message": "server receives secrets via env: GITHUB_PERSONAL_ACCESS_TOKEN \u2014 a compromised server leaks these",
+          "id": "e4e7464550cb898da9fb4c5f1b9b6be0",
+          "title": "Secrets handed to the server",
+          "owasp": [
+            "MCP01",
+            "MCP02"
+          ],
+          "fix": "Give the server a token with the narrowest scope and shortest life that works, and only to servers you trust."
+        },
+        {
+          "severity": "low",
+          "check": "plaintext-secret",
+          "message": "credential stored in plain text in the config file: env GITHUB_PERSONAL_ACCESS_TOKEN \u2014 anything that can read this file has it; keep it in your OS keychain or shell environment and reference it",
+          "id": "30b062450fc963fd78bece18e188af87",
+          "title": "Credential stored in plain text in the config",
+          "owasp": [
+            "MCP01"
+          ],
+          "fix": "Move the value to your OS keychain or shell environment and reference it (\"${TOKEN}\" where the client supports it). In a project file: rotate it and make sure the file is not committed."
+        }
+      ],
+      "suppressed": []
+    },
+    {
+      "name": "vendor-crm",
+      "client": "demo",
+      "path": "(built-in demo - not your machine)",
+      "score": 50,
+      "grade": "D",
+      "findings": [
+        {
+          "severity": "medium",
+          "check": "remote-server",
+          "message": "remote MCP server URL (traffic leaves the machine): http://mcp.crm-vendor.example/...",
+          "id": "9ee1e634a69863b4748faa085b61afdc",
+          "title": "Remote MCP server (traffic leaves the machine)",
+          "owasp": [
+            "MCP10"
+          ],
+          "fix": "Check you trust the operator with everything your agent will send. Trust a host of your own with `--allow-host`."
+        },
+        {
+          "severity": "high",
+          "check": "insecure-transport",
+          "message": "remote MCP server in 'url' is reached over plain http:// (no TLS): anyone on the network path can read its traffic, including any token, and rewrite the tool descriptions your agent reads; use https://",
+          "id": "3e4ef03f771260f7acc0bbe9f266719f",
+          "title": "Remote MCP server reached without TLS",
+          "owasp": [
+            "MCP07",
+            "MCP03"
+          ],
+          "fix": "Use the server's https:// (or wss://) URL. Over plain http anyone on the network can read tokens and rewrite tool descriptions."
+        },
+        {
+          "severity": "high",
+          "check": "credential-in-url",
+          "message": "credential written into a URL in 'url' (api_key): URLs are kept in logs, proxies and shell history; keeping credentials out of URLs is standard practice. Send it in an Authorization header that references an environment variable",
+          "id": "08ccd4152dadf79b361235bcbd724074",
+          "title": "Credential written into a server URL",
+          "owasp": [
+            "MCP01",
+            "MCP07"
+          ],
+          "fix": "Rotate the credential, remove it from the URL and send it in an Authorization header that references an environment variable (\"Bearer ${TOKEN}\"), or use the server's OAuth sign-in."
+        }
+      ],
+      "suppressed": []
+    },
+    {
+      "name": "quick-setup",
+      "client": "demo",
+      "path": "(built-in demo - not your machine)",
+      "score": 0,
+      "grade": "F",
+      "findings": [
+        {
+          "severity": "critical",
+          "check": "suspicious-command",
+          "message": "server runs 'curl' inside 'bash' \u2014 a downloader/shell, not a server binary",
+          "id": "1459957684cb4356d93366355bf4e3ca",
+          "title": "Launch command downloads or runs code through a shell",
+          "owasp": [
+            "MCP05",
+            "MCP04"
+          ],
+          "fix": "Replace the entry with a pinned package (npx pkg@1.2.3, uvx pkg==1.2.3) or a local binary you have reviewed. `--fix --remove` can delete it."
+        },
+        {
+          "severity": "critical",
+          "check": "pipe-to-shell",
+          "message": "command pipes content into a shell (classic curl|sh pattern)",
+          "id": "d432a7076d1926183b0abe1ea445cd41",
+          "title": "Downloaded script piped straight into a shell",
+          "owasp": [
+            "MCP05",
+            "MCP04"
+          ],
+          "fix": "Never run `curl ... | sh` from an MCP config: download, review and pin the script, or install the server from a package registry. `--fix --remove` can delete it."
+        },
+        {
+          "severity": "critical",
+          "check": "exfiltration-endpoint",
+          "message": "remote endpoint in args: https://get.tools.example/...",
+          "id": "2976071f3b6004ce6be35d3efe89b71f",
+          "title": "Remote endpoint baked into the launch",
+          "owasp": [
+            "MCP10",
+            "MCP04"
+          ],
+          "fix": "Confirm the host is one you expect this server to talk to. If it is yours, trust it with `--allow-host`; if not, remove the server."
+        }
+      ],
+      "suppressed": []
+    }
+  ],
+  "summary": {
+    "servers": 4,
+    "findings": 9,
+    "by_severity": {
+      "critical": 3,
+      "high": 2,
+      "medium": 3,
+      "low": 1
+    },
+    "overall_grade": "F"
+  },
+  "policy": {
+    "suppressed": 0,
+    "expired": [],
+    "known": 0,
+    "new": 0,
+    "fixed": 0,
+    "baseline": false,
+    "unused": []
+  },
+  "warnings": [],
+  "scan": {
+    "deep": false
+  }
+}

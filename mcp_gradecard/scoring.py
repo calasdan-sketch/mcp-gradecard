@@ -336,7 +336,9 @@ def _fingerprint(r: dict, f: dict) -> str:
     import os
     import re
     try:
-        path = os.path.realpath(str(r.get("path")))
+        from . import demo as demo_mod
+        path = (demo_mod.LABEL if r.get("path") == demo_mod.LABEL
+                else os.path.realpath(str(r.get("path"))))
     except (OSError, ValueError):
         path = str(r.get("path"))
     key = json.dumps([r.get("client"), path, r.get("project"),
@@ -355,11 +357,18 @@ def render_sarif(results: list[dict], version: str,
     """SARIF 2.1.0 log (GitHub code scanning, IDE viewers). One rule per
     check id; each finding points at the config file that holds the server."""
     import pathlib
+    from . import demo as demo_mod
+    demo_label = demo_mod.LABEL
     rules: dict[str, dict] = {}
     out = []
     for r in results:
         try:
-            uri = pathlib.Path(r["path"]).resolve().as_uri()
+            if r["path"] == demo_label:
+                # not a file: resolving it would invent a path under the
+                # working directory (and change the fingerprints with it)
+                uri = "urn:mcp-gradecard:demo"
+            else:
+                uri = pathlib.Path(r["path"]).resolve().as_uri()
         except ValueError:
             uri = str(r["path"]).replace("\\", "/")
         listed = [(f, None) for f in r["findings"]] + [
@@ -399,6 +408,7 @@ def render_sarif(results: list[dict], version: str,
         "runs": [{
             "tool": {"driver": {
                 "name": "mcp-gradecard", "version": version,
+                "organization": "Calas Automations Inc.",
                 "informationUri":
                     "https://github.com/calasdan-sketch/mcp-gradecard",
                 "rules": list(rules.values())}},

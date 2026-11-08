@@ -127,7 +127,7 @@ def cisco(entries):
 
 def split_summary(rows):
     return {name: summary([r for r in rows if r["split"] == name])
-            for name in ("dev", "holdout", "r3", "r3b")}
+            for name in ("dev", "holdout", "r3", "r3b", "r5")}
 
 
 def main():
@@ -164,7 +164,7 @@ def main():
             r = rates([x for x in rs if x["class"] not in text], "flagged")
             print("  %-14s precision %.3f recall %.3f false-positive rate %.3f"
                   % (name, r["precision"], r["recall"], r["false_positive_rate"]))
-        for split in ("holdout", "r3", "r3b"):
+        for split in ("holdout", "r3", "r3b", "r5"):
             print("%s only:" % split.capitalize())
             for name, rs in (("mcp-gradecard", rows), ("Cisco YARA", crow)):
                 r = rates([x for x in rs if x["class"] not in text

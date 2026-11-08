@@ -204,10 +204,10 @@ class TestSuppressions(Setup):
                          "expires": "2027-02-01"}])
         for fmt in ("html", "markdown"):
             _c, out, _e = run_cli("--config", self.cfg, "--suppressions", sup, "--format", fmt,
-                                  "--prepared-by", "Calas Automations")
+                                  "--prepared-by", "Calas Automations Inc.")
             self.assertIn("Accepted findings", out)
             self.assertIn("pinned by the CI image", out)
-            self.assertIn("Calas Automations", out)
+            self.assertIn("Calas Automations Inc.", out)
             self.assertIn("Inventory", out)
             self.assertIn("report id", out)
 

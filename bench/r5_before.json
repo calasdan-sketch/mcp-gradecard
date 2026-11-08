@@ -1,0 +1,51 @@
+{
+ "any_finding": {
+  "false_positive_rate": 0.0,
+  "fn": 17,
+  "fp": 0,
+  "precision": 1.0,
+  "recall": 0.37,
+  "tn": 14,
+  "tp": 10
+ },
+ "benign": 14,
+ "false_positives": [],
+ "high_plus": {
+  "false_positive_rate": 0.0,
+  "fn": 23,
+  "fp": 0,
+  "precision": 1.0,
+  "recall": 0.148,
+  "tn": 14,
+  "tp": 4
+ },
+ "malicious": 27,
+ "medium_plus": {
+  "false_positive_rate": 0.0,
+  "fn": 17,
+  "fp": 0,
+  "precision": 1.0,
+  "recall": 0.37,
+  "tn": 14,
+  "tp": 10
+ },
+ "missed": [
+  "r5-m-result-01",
+  "r5-m-result-02",
+  "r5-m-memory-01",
+  "r5-m-memory-02",
+  "r5-m-config-01",
+  "r5-m-config-02",
+  "r5-m-config-03",
+  "r5-m-image-01",
+  "r5-m-chain-01",
+  "r5-m-fetch-02",
+  "r5-m-disable-02",
+  "r5-m-conceal-01",
+  "r5-m-priority-01",
+  "r5-m-evasive-01",
+  "r5-m-evasive-02",
+  "r5-m-evasive-03",
+  "r5-m-field-02"
+ ]
+}

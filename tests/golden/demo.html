@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+<meta name="referrer" content="no-referrer">
+<title>MCP Safety Check: Example Co</title><style>
+:root{--bg:#f7f7f5;--card:#fff;--ink:#1c1d1f;--muted:#5d6168;--line:#e3e3df;
+--crit:#b3261e;--high:#c2410c;--med:#a16207;--low:#4b5563;--ok:#15803d;
+--chip:#efefeb;--a:#15803d;--b:#4d7c0f;--c:#a16207;--d:#c2410c;--f:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#111214;--card:#1a1b1e;
+--ink:#e8e8e6;--muted:#a1a4aa;--line:#2c2e33;--chip:#26282c;--crit:#f2867e;
+--high:#fb923c;--med:#facc15;--low:#9ca3af;--ok:#4ade80;--a:#4ade80;
+--b:#a3e635;--c:#facc15;--d:#fb923c;--f:#f2867e}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55
+-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+main{max-width:960px;margin:0 auto;padding:32px 16px 64px}
+h1{font-size:26px;margin:0 0 4px}h2{font-size:19px;margin:36px 0 12px}
+h3{font-size:16px;margin:0}
+.meta{color:var(--muted);font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;
+padding:18px 20px;margin:12px 0}
+.hero{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.hero>div:last-child{flex:1;min-width:240px}
+td.nm{white-space:nowrap}
+code{font:13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+background:var(--chip);border-radius:4px;padding:0 4px}
+.grade{width:76px;height:76px;border-radius:14px;display:flex;
+align-items:center;justify-content:center;font-size:42px;font-weight:700;
+color:#fff;flex:none}
+.g-A{background:var(--a)}.g-B{background:var(--b)}.g-C{background:var(--c)}
+.g-D{background:var(--d)}.g-F{background:var(--f)}.g-\?{background:var(--low)}
+.grade.sm{width:34px;height:34px;font-size:18px;border-radius:8px}
+.verdict{font-size:17px;font-weight:600;margin:0 0 6px}
+.counts{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.pill{border-radius:999px;padding:2px 10px;font-size:13px;font-weight:600;
+background:var(--chip)}
+.sev{display:inline-block;min-width:70px;text-align:center;border-radius:6px;
+padding:1px 6px;font-size:12px;font-weight:700;text-transform:uppercase;
+color:#fff}
+.s-critical{background:var(--crit)}.s-high{background:var(--high)}
+.s-medium{background:var(--med)}.s-low{background:var(--low)}
+@media (prefers-color-scheme:dark){.sev,.grade{color:#111214}}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);
+vertical-align:top}
+th{font-size:12px;color:var(--muted);text-transform:uppercase;
+letter-spacing:.04em}
+td.msg{overflow-wrap:anywhere}
+.server-head{display:flex;gap:12px;align-items:center}
+.path{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
+.tag{display:inline-block;background:var(--chip);border-radius:5px;
+padding:0 6px;margin:1px 2px 1px 0;font-size:12px;white-space:nowrap}
+.fix{margin:10px 0 0;padding-left:18px}.fix li{margin:4px 0}
+.ok{color:var(--ok);font-weight:600}
+.warn{border-left:4px solid var(--high)}
+ul.plain{margin:6px 0;padding-left:18px}
+footer{margin-top:40px;color:var(--muted);font-size:12px}
+a{color:inherit}
+@media print{body{background:#fff}.card{break-inside:avoid}main{padding:0}}
+@media (max-width:640px){th.hide,td.hide{display:none}}
+</style></head><body><main>
+<h1>MCP Safety Check: Example Co</h1>
+<div class="meta">Generated 2026-01-01 00:00 UTC by mcp-gradecard VERSION &middot; 1 config file(s) &middot; 4 server(s) &middot; static audit &middot; prepared by Calas Automations Inc. &middot; report id 98b2ec45ece5</div>
+<section class="card hero">
+<div class="grade g-F" aria-label="grade F">F</div>
+<div>
+<p class="verdict">3 critical finding(s): act on these before you use these servers again.</p>
+<div class="meta">Overall grade is the lowest grade of any server. Each server starts at 100 and loses 40 per critical, 20 per high, 10 per medium and 5 per low finding; any critical caps it at D.</div>
+<div class="counts">
+<span class="pill"><span class="sev s-critical">critical</span> 3</span>
+<span class="pill"><span class="sev s-high">high</span> 2</span>
+<span class="pill"><span class="sev s-medium">medium</span> 3</span>
+<span class="pill"><span class="sev s-low">low</span> 1</span>
+</div></div></section>
+<h2>Scope and method</h2><section class="card"><table>
+<tr><th>Prepared for</th><td class="msg">Example Co</td></tr>
+<tr><th>Prepared by</th><td class="msg">Calas Automations Inc.</td></tr>
+<tr><th>Date and tool</th><td class="msg">2026-01-01 00:00 UTC; mcp-gradecard VERSION</td></tr>
+<tr><th>What was examined</th><td class="msg">1 configuration file(s) (demo) holding 4 MCP server(s). Only the settings written in those files were read.</td></tr>
+<tr><th>Live tool scan</th><td class="msg">Not done. No server was launched and no tool description was read, so poisoned tool text is not covered by this report.</td></tr>
+<tr><th>Package lookups</th><td class="msg">mcp-gradecard sent nothing anywhere. The advisory feed in this version lists 6 known issue(s); a package with no published advisory reads as clean.</td></tr>
+<tr><th>Engagement scope</th><td class="msg">Sample data only.</td></tr>
+<tr><th>Review by a person</th><td class="msg">Not recorded. Findings come from automatic rules; a match is a lead for a person to confirm, not a verdict.</td></tr>
+<tr><th>Grades</th><td class="msg">A server starts at 100 and loses 40 per critical, 20 per high, 10 per medium and 5 per low finding (A 90+, B 75+, C 60+, D 40+, F below); any critical caps it at D. The overall grade is the lowest. Grades are comparable only between runs of the same mcp-gradecard version: newer versions add checks.</td></tr>
+</table><p class="meta">Severity: critical = the server runs a downloader, pipes content into a shell or is started with encoded code, or a tool description tries to take control of the agent; fix before using it; high = a serious weakness, such as a credential in a URL, a plain-http remote server or a code-injecting launch setting; fix soon; medium = weakens the setup or makes an attack easier, such as an unpinned package; plan a fix; low = hygiene; worth tidying.</p></section>
+<h2>Fix these first</h2><section class="card"><table>
+<tr><th>Severity</th><th>Server</th><th>Finding</th></tr>
+<tr><td><span class="sev s-critical">critical</span></td><td class="nm">quick-setup</td><td class="msg"><strong>Launch command downloads or runs code through a shell</strong><br>server runs &#x27;curl&#x27; inside &#x27;bash&#x27; — a downloader/shell, not a server binary</td></tr>
+<tr><td><span class="sev s-critical">critical</span></td><td class="nm">quick-setup</td><td class="msg"><strong>Downloaded script piped straight into a shell</strong><br>command pipes content into a shell (classic curl|sh pattern)</td></tr>
+<tr><td><span class="sev s-critical">critical</span></td><td class="nm">quick-setup</td><td class="msg"><strong>Remote endpoint baked into the launch</strong><br>remote endpoint in args: https://get.tools.example/...</td></tr>
+<tr><td><span class="sev s-high">high</span></td><td class="nm">vendor-crm</td><td class="msg"><strong>Remote MCP server reached without TLS</strong><br>remote MCP server in &#x27;url&#x27; is reached over plain http:// (no TLS): anyone on the network path can read its traffic, including any token, and rewrite the tool descriptions your agent reads; use https://</td></tr>
+<tr><td><span class="sev s-high">high</span></td><td class="nm">vendor-crm</td><td class="msg"><strong>Credential written into a server URL</strong><br>credential written into a URL in &#x27;url&#x27; (api_key): URLs are kept in logs, proxies and shell history; keeping credentials out of URLs is standard practice. Send it in an Authorization header that references an environment variable</td></tr>
+</table></section>
+<h2>Servers</h2><section class="card"><table>
+<tr><th>Grade</th><th>Server</th><th class="hide">Client</th><th>Score</th><th>Findings</th></tr>
+<tr><td><div class="grade sm g-F" aria-label="grade F">F</div></td><td>quick-setup</td><td class="hide">demo</td><td>0/100</td><td>3 critical</td></tr>
+<tr><td><div class="grade sm g-D" aria-label="grade D">D</div></td><td>vendor-crm</td><td class="hide">demo</td><td>50/100</td><td>2 high, 1 medium</td></tr>
+<tr><td><div class="grade sm g-B" aria-label="grade B">B</div></td><td>github</td><td class="hide">demo</td><td>75/100</td><td>2 medium, 1 low</td></tr>
+<tr><td><div class="grade sm g-A" aria-label="grade A">A</div></td><td>filesystem</td><td class="hide">demo</td><td>100/100</td><td>none</td></tr>
+</table></section>
+<h2>Findings by server</h2>
+<section class="card"><div class="server-head">
+<div class="grade sm g-F" aria-label="grade F">F</div>
+<div><h3>quick-setup <span class="meta">&lt;demo&gt; &middot; 0/100</span></h3><div class="path">(built-in demo - not your machine)</div></div></div>
+<table><tr><th>Severity</th><th>Finding</th><th class="hide">OWASP MCP</th></tr>
+<tr><td><span class="sev s-critical">critical</span></td><td class="msg"><strong>Launch command downloads or runs code through a shell</strong> <span class="meta">(suspicious-command)</span><br>server runs &#x27;curl&#x27; inside &#x27;bash&#x27; — a downloader/shell, not a server binary</td><td class="hide"><span class="tag" title="Command Injection &amp; Execution">MCP05</span><span class="tag" title="Software Supply Chain Attacks &amp; Dependency Tampering">MCP04</span></td></tr>
+<tr><td><span class="sev s-critical">critical</span></td><td class="msg"><strong>Downloaded script piped straight into a shell</strong> <span class="meta">(pipe-to-shell)</span><br>command pipes content into a shell (classic curl|sh pattern)</td><td class="hide"><span class="tag" title="Command Injection &amp; Execution">MCP05</span><span class="tag" title="Software Supply Chain Attacks &amp; Dependency Tampering">MCP04</span></td></tr>
+<tr><td><span class="sev s-critical">critical</span></td><td class="msg"><strong>Remote endpoint baked into the launch</strong> <span class="meta">(exfiltration-endpoint)</span><br>remote endpoint in args: https://get.tools.example/...</td><td class="hide"><span class="tag" title="Context Injection &amp; Over-Sharing">MCP10</span><span class="tag" title="Software Supply Chain Attacks &amp; Dependency Tampering">MCP04</span></td></tr>
+</table>
+<p class="meta" style="margin:12px 0 0">What to do</p><ul class="fix">
+<li><strong>Launch command downloads or runs code through a shell:</strong> Replace the entry with a pinned package (npx pkg@1.2.3, uvx pkg==1.2.3) or a local binary you have reviewed. <code>--fix --remove</code> can delete it.</li>
+<li><strong>Downloaded script piped straight into a shell:</strong> Never run <code>curl ... | sh</code> from an MCP config: download, review and pin the script, or install the server from a package registry. <code>--fix --remove</code> can delete it.</li>
+<li><strong>Remote endpoint baked into the launch:</strong> Confirm the host is one you expect this server to talk to. If it is yours, trust it with <code>--allow-host</code>; if not, remove the server.</li>
+</ul>
+</section>
+<section class="card"><div class="server-head">
+<div class="grade sm g-D" aria-label="grade D">D</div>
+<div><h3>vendor-crm <span class="meta">&lt;demo&gt; &middot; 50/100</span></h3><div class="path">(built-in demo - not your machine)</div></div></div>
+<table><tr><th>Severity</th><th>Finding</th><th class="hide">OWASP MCP</th></tr>
+<tr><td><span class="sev s-high">high</span></td><td class="msg"><strong>Remote MCP server reached without TLS</strong> <span class="meta">(insecure-transport)</span><br>remote MCP server in &#x27;url&#x27; is reached over plain http:// (no TLS): anyone on the network path can read its traffic, including any token, and rewrite the tool descriptions your agent reads; use https://</td><td class="hide"><span class="tag" title="Insufficient Authentication &amp; Authorization">MCP07</span><span class="tag" title="Tool Poisoning">MCP03</span></td></tr>
+<tr><td><span class="sev s-high">high</span></td><td class="msg"><strong>Credential written into a server URL</strong> <span class="meta">(credential-in-url)</span><br>credential written into a URL in &#x27;url&#x27; (api_key): URLs are kept in logs, proxies and shell history; keeping credentials out of URLs is standard practice. Send it in an Authorization header that references an environment variable</td><td class="hide"><span class="tag" title="Token Mismanagement &amp; Secret Exposure">MCP01</span><span class="tag" title="Insufficient Authentication &amp; Authorization">MCP07</span></td></tr>
+<tr><td><span class="sev s-medium">medium</span></td><td class="msg"><strong>Remote MCP server (traffic leaves the machine)</strong> <span class="meta">(remote-server)</span><br>remote MCP server URL (traffic leaves the machine): http://mcp.crm-vendor.example/...</td><td class="hide"><span class="tag" title="Context Injection &amp; Over-Sharing">MCP10</span></td></tr>
+</table>
+<p class="meta" style="margin:12px 0 0">What to do</p><ul class="fix">
+<li><strong>Remote MCP server reached without TLS:</strong> Use the server&#x27;s https:// (or wss://) URL. Over plain http anyone on the network can read tokens and rewrite tool descriptions.</li>
+<li><strong>Credential written into a server URL:</strong> Rotate the credential, remove it from the URL and send it in an Authorization header that references an environment variable (&quot;Bearer ${TOKEN}&quot;), or use the server&#x27;s OAuth sign-in.</li>
+<li><strong>Remote MCP server (traffic leaves the machine):</strong> Check you trust the operator with everything your agent will send. Trust a host of your own with <code>--allow-host</code>.</li>
+</ul>
+</section>
+<section class="card"><div class="server-head">
+<div class="grade sm g-B" aria-label="grade B">B</div>
+<div><h3>github <span class="meta">&lt;demo&gt; &middot; 75/100</span></h3><div class="path">(built-in demo - not your machine)</div></div></div>
+<table><tr><th>Severity</th><th>Finding</th><th class="hide">OWASP MCP</th></tr>
+<tr><td><span class="sev s-medium">medium</span></td><td class="msg"><strong>Package version not pinned</strong> <span class="meta">(floating-version)</span><br>unpinned package &#x27;@modelcontextprotocol/server-github&#x27; — every launch can pull a different (possibly compromised) release; pin with @modelcontextprotocol/server-github@x.y.z</td><td class="hide"><span class="tag" title="Software Supply Chain Attacks &amp; Dependency Tampering">MCP04</span></td></tr>
+<tr><td><span class="sev s-medium">medium</span></td><td class="msg"><strong>Secrets handed to the server</strong> <span class="meta">(secret-env)</span><br>server receives secrets via env: GITHUB_PERSONAL_ACCESS_TOKEN — a compromised server leaks these</td><td class="hide"><span class="tag" title="Token Mismanagement &amp; Secret Exposure">MCP01</span><span class="tag" title="Privilege Escalation via Scope Creep">MCP02</span></td></tr>
+<tr><td><span class="sev s-low">low</span></td><td class="msg"><strong>Credential stored in plain text in the config</strong> <span class="meta">(plaintext-secret)</span><br>credential stored in plain text in the config file: env GITHUB_PERSONAL_ACCESS_TOKEN — anything that can read this file has it; keep it in your OS keychain or shell environment and reference it</td><td class="hide"><span class="tag" title="Token Mismanagement &amp; Secret Exposure">MCP01</span></td></tr>
+</table>
+<p class="meta" style="margin:12px 0 0">What to do</p><ul class="fix">
+<li><strong>Package version not pinned:</strong> Pin an exact version (pkg@1.2.3 / pkg==1.2.3) so a compromised release cannot reach you on the next launch.</li>
+<li><strong>Secrets handed to the server:</strong> Give the server a token with the narrowest scope and shortest life that works, and only to servers you trust.</li>
+<li><strong>Credential stored in plain text in the config:</strong> Move the value to your OS keychain or shell environment and reference it (&quot;${TOKEN}&quot; where the client supports it). In a project file: rotate it and make sure the file is not committed.</li>
+</ul>
+</section>
+<section class="card"><div class="server-head">
+<div class="grade sm g-A" aria-label="grade A">A</div>
+<div><h3>filesystem <span class="meta">&lt;demo&gt; &middot; 100/100</span></h3><div class="path">(built-in demo - not your machine)</div></div></div>
+<p class="ok">No findings.</p>
+</section>
+<h2>Inventory</h2><section class="card"><table>
+<tr><th>Server</th><th class="hide">Client</th><th>Runs or connects to</th></tr>
+<tr><td>filesystem</td><td class="hide">demo</td><td class="msg">npm @modelcontextprotocol/server-filesystem 2026.1.14</td></tr>
+<tr><td>github</td><td class="hide">demo</td><td class="msg">npm @modelcontextprotocol/server-github (not pinned)</td></tr>
+<tr><td>vendor-crm</td><td class="hide">demo</td><td class="msg">remote http://mcp.crm-vendor.example</td></tr>
+<tr><td>quick-setup</td><td class="hide">demo</td><td class="msg">local command</td></tr>
+</table></section>
+<h2>OWASP MCP Top 10</h2><section class="card"><table>
+<tr><th>Risk</th><th>Findings</th></tr>
+<tr><td><span class="tag">MCP01</span> Token Mismanagement &amp; Secret Exposure</td><td>3</td></tr>
+<tr><td><span class="tag">MCP02</span> Privilege Escalation via Scope Creep</td><td>1</td></tr>
+<tr><td><span class="tag">MCP03</span> Tool Poisoning</td><td>1</td></tr>
+<tr><td><span class="tag">MCP04</span> Software Supply Chain Attacks &amp; Dependency Tampering</td><td>4</td></tr>
+<tr><td><span class="tag">MCP05</span> Command Injection &amp; Execution</td><td>2</td></tr>
+<tr><td><span class="tag">MCP06</span> Prompt Injection via Contextual Payloads</td><td>0</td></tr>
+<tr><td><span class="tag">MCP07</span> Insufficient Authentication &amp; Authorization</td><td>2</td></tr>
+<tr><td><span class="tag">MCP08</span> Lack of Audit and Telemetry</td><td>0</td></tr>
+<tr><td><span class="tag">MCP09</span> Shadow MCP Servers</td><td>0</td></tr>
+<tr><td><span class="tag">MCP10</span> Context Injection &amp; Over-Sharing</td><td>2</td></tr>
+</table><p class="meta">The mapping is mcp-gradecard's reading of which risk each finding is evidence of. A zero means no finding of that kind, not that the risk is absent. Source: <a href="https://owasp.org/www-project-mcp-top-10/">OWASP MCP Top 10</a> (beta).</p></section>
+<h2>What this audit covers</h2><section class="card"><ul class="plain">
+<li>The static audit reads configuration files only; it does not run or connect to any server.</li>
+<li>With --deep, tool descriptions are read from the servers it was allowed to launch and checked against known prompt-injection patterns. That is a heuristic: a clean scan is not proof that a server is safe, and a match is a lead for a person to read, not a verdict.</li>
+<li>Remote (http/sse) servers are judged by their configuration; their live tool lists are not fetched.</li>
+<li>Known-vulnerable packages are matched against the advisory feed built into this version (and OSV with --online); a package with no published advisory reads as clean.</li>
+<li>Nothing here reviews a server&#x27;s source code or what its tools do when called.</li>
+<li>What this report supports: on the date shown, this version of mcp-gradecard found the findings listed in the configuration files and tool lists named in it.</li>
+<li>What it does not support: that any server is safe, secure or compliant with a standard. It is not a certification, a penetration test or a code review.</li>
+</ul></section>
+<footer>mcp-gradecard VERSION &middot; secrets found in configs are never printed in this report.</footer>
+</main></body></html>

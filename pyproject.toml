@@ -10,7 +10,8 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
-authors = [{name = "Dan Calas"}]
+authors = [{name = "Calas Automations Inc."}]
+maintainers = [{name = "Calas Automations Inc."}]
 keywords = ["mcp", "security", "audit", "prompt-injection", "supply-chain", "ai-agents"]
 classifiers = [
     "Development Status :: 4 - Beta",

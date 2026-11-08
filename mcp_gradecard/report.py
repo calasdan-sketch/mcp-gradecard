@@ -44,6 +44,90 @@ LIMITS = (
 )
 
 
+SEVERITY_KEY = (
+    ("critical", "the server runs a downloader, pipes content into a shell "
+                 "or is started with encoded code, or a tool description "
+                 "tries to take control of the agent; fix before using it"),
+    ("high", "a serious weakness, such as a credential in a URL, a plain-http "
+             "remote server or a code-injecting launch setting; fix soon"),
+    ("medium", "weakens the setup or makes an attack easier, such as an "
+               "unpinned package; plan a fix"),
+    ("low", "hygiene; worth tidying"),
+)
+
+
+def _scope_rows(results: list[dict], configs: "list[dict] | None",
+                version: str, deep: bool, when: str,
+                prepared_by: "str | None", client: "str | None",
+                scope_note: "str | None", reviewed_by: "str | None",
+                online: bool, n_advisories: "int | None"
+                ) -> "list[tuple[str, str]]":
+    """The scope-and-method statement a buyer of a one-off audit expects:
+    for whom, by whom, when, what was looked at, how, what was not, and
+    whether a person read the serious findings. Plain (label, text) pairs;
+    the renderers escape them."""
+    def given(v):
+        return v.strip() if isinstance(v, str) and v.strip() else None
+
+    configs = configs or []
+    n_files = len({c["path"] for c in configs})
+    clients = sorted({str(c.get("client")) for c in configs if c.get("client")})
+    rows = []
+    if given(client):
+        rows.append(("Prepared for", given(client)))
+    if given(prepared_by):
+        rows.append(("Prepared by", given(prepared_by)))
+    rows.append(("Date and tool", f"{when}; mcp-gradecard {version}"))
+    if n_files:
+        examined = (f"{n_files} configuration file(s)"
+                    + (f" ({', '.join(clients)})" if clients else "")
+                    + f" holding {len(results)} MCP server(s). Only the "
+                    "settings written in those files were read.")
+    else:
+        examined = (f"{len(results)} MCP server(s) from saved tool lists "
+                    "or a built-in sample; no configuration file was read.")
+    rows.append(("What was examined", examined))
+    read = [r for r in results if r.get("deep_read") is not None]
+    if deep:
+        rows.append(("Live tool scan",
+                     f"The tool lists of {len(read)} of {len(results)} "
+                     "server(s) were read and scanned for prompt-injection "
+                     "patterns; the others were not launched or were saved "
+                     "lists, as each server's section says."))
+    else:
+        rows.append(("Live tool scan",
+                     "Not done. No server was launched and no tool "
+                     "description was read, so poisoned tool text is not "
+                     "covered by this report."))
+    rows.append(("Package lookups",
+                 ("Online: package names and versions were also checked "
+                  "against OSV."
+                  if online else
+                  "mcp-gradecard sent nothing anywhere"
+                  + ("; the servers it launched may have contacted their "
+                     "own services." if deep else "."))
+                 + (f" The advisory feed in this version lists "
+                    f"{n_advisories} known issue(s); a package with no "
+                    "published advisory reads as clean."
+                    if n_advisories is not None else "")))
+    if given(scope_note):
+        rows.append(("Engagement scope", given(scope_note)))
+    rows.append(("Review by a person",
+                 (f"Critical and high findings were read by "
+                  f"{given(reviewed_by)} before this report was issued."
+                  if given(reviewed_by) else
+                  "Not recorded. Findings come from automatic rules; a "
+                  "match is a lead for a person to confirm, not a verdict.")))
+    rows.append(("Grades",
+                 "A server starts at 100 and loses 40 per critical, 20 per "
+                 "high, 10 per medium and 5 per low finding (A 90+, B 75+, "
+                 "C 60+, D 40+, F below); any critical caps it at D. The "
+                 "overall grade is the lowest. Grades are comparable only "
+                 "between runs of the same mcp-gradecard version: newer "
+                 "versions add checks."))
+    return rows
+
+
 def _worst_grade(results: list[dict]) -> str:
     if not results:
         return "?"
@@ -263,7 +347,11 @@ def render_html(results: list[dict], warnings: "list[dict] | None" = None,
                 generated: "str | None" = None,
                 prepared_by: "str | None" = None,
                 policy: "dict | None" = None,
-                comparison: "dict | None" = None) -> str:
+                comparison: "dict | None" = None,
+                client: "str | None" = None,
+                scope_note: "str | None" = None,
+                reviewed_by: "str | None" = None, online: bool = False,
+                n_advisories: "int | None" = None) -> str:
     """A self-contained HTML report (inline styles, no scripts, no external
     resources)."""
     warnings = warnings or []
@@ -302,6 +390,15 @@ def render_html(results: list[dict], warnings: "list[dict] | None" = None,
     for sev in ("critical", "high", "medium", "low"):
         w(f'<span class="pill">{_sev(sev)} {counts[sev]}</span>')
     w("</div></div></section>")
+
+    w("<h2>Scope and method</h2><section class=\"card\"><table>")
+    for label, text in _scope_rows(results, configs, version, deep, when,
+                                   prepared_by, client, scope_note,
+                                   reviewed_by, online, n_advisories):
+        w(f"<tr><th>{_h(label)}</th><td class=\"msg\">{_h(text)}</td></tr>")
+    w("</table><p class=\"meta\">Severity: "
+      + _h("; ".join(f"{k} = {v}" for k, v in SEVERITY_KEY))
+      + ".</p></section>")
 
     if warnings:
         w('<section class="card warn"><h3>Not audited</h3><ul class="plain">')
@@ -512,7 +609,11 @@ def render_markdown(results: list[dict],
                     generated: "str | None" = None,
                     prepared_by: "str | None" = None,
                     policy: "dict | None" = None,
-                    comparison: "dict | None" = None) -> str:
+                    comparison: "dict | None" = None,
+                    client: "str | None" = None,
+                    scope_note: "str | None" = None,
+                    reviewed_by: "str | None" = None, online: bool = False,
+                    n_advisories: "int | None" = None) -> str:
     """The same report as render_html, in Markdown (a PR comment, a ticket,
     a wiki page)."""
     warnings = warnings or []
@@ -536,6 +637,14 @@ def render_markdown(results: list[dict],
              "| Critical | High | Medium | Low |", "|---|---|---|---|",
              f"| {counts['critical']} | {counts['high']} | "
              f"{counts['medium']} | {counts['low']} |", ""]
+    lines += ["## Scope and method", ""]
+    lines += [f"- **{_m(label)}:** {_m(text)}" for label, text in
+              _scope_rows(results, configs, version, deep, when, prepared_by,
+                          client, scope_note, reviewed_by, online,
+                          n_advisories)]
+    lines += ["", "Severity: " + _m("; ".join(f"{k} = {v}"
+                                            for k, v in SEVERITY_KEY)) + ".",
+              ""]
     if warnings:
         lines += ["## Not audited", ""]
         lines += [f"- {_mc(w['path'])} ({_mc(w['client'])}): {_m(w['reason'])}"

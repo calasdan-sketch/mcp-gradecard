@@ -1479,7 +1479,18 @@ def detect_known_bad(name: str, cfg: dict,
         fixed = adv.get("fixed_in")
         installed = pkgs.get(target)
         cve = adv.get("cve") or "advisory"
-        if fixed and installed and _ver_tuple(installed) >= _ver_tuple(fixed):
+        lines = adv.get("fixed_lines")
+        if lines and installed and isinstance(lines, list) and all(
+                isinstance(x, str) for x in lines):
+            # Two numbering schemes (0.6.4 and 2025.7.1): compare against the
+            # fixed version of the line the installed one belongs to, the
+            # highest fixed version whose first number is not above it.
+            have = _ver_tuple(installed)
+            own = [_ver_tuple(x) for x in lines
+                   if _ver_tuple(x)[:1] <= have[:1]]
+            if own and have >= max(own):
+                continue  # patched
+        elif fixed and installed and _ver_tuple(installed) >= _ver_tuple(fixed):
             continue  # patched
         sev = adv.get("severity", "high")
         if fixed:

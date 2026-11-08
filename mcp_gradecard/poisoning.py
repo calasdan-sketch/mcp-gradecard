@@ -1124,6 +1124,126 @@ def _passes_data_on(view: str, found: set) -> None:
                 break
 
 
+# --- Round 5: results, memory, configuration, images, other tools ----------
+#
+# Families the earlier rounds did not read for: text that tells the agent to
+# obey what a tool RESULT or an image says, to write into its own memory or
+# rules files or the user's settings, to carry data out in a markdown image,
+# to call another tool without asking, or to take its instructions from a
+# page. Each is anchored on an object that an ordinary description does not
+# order an agent to change (memory, CLAUDE.md, a shell profile, the user's
+# MCP settings) or on a claim of authority over the user.
+_USER_N = r"(?:the |a |any )?(?:user|human|person|operator)"
+_R5_HIJACK = (
+    # "as if the user had typed them", "takes the place of the user's request"
+    re.compile(r"\bas if %s(?:'s)? (?:had )?(?:typed|written|said|asked|sent"
+               r"|entered|requested)\b" % _USER_N),
+    re.compile(r"\btakes? the place of %s(?:'s)?\b" % _USER_N),
+    re.compile(r"\boutranks? %s\b" % _USER_N),
+    # "whatever the user says"
+    re.compile(r"\b(?:whatever|regardless of what|no matter what) %s "
+               r"(?:says?|said|asks?|asked|wants?|types?|typed|requests?)\b"
+               % _USER_N),
+    # "when this server and the user disagree, this server is right"
+    re.compile(r"\b(?:disagree|conflict|differ)\w*\b[,;:]?(?: \S+){0,8} "
+               r"(?:this|the) (?:server|tool|service|note|text|description)"
+               r"\b(?: \w+){0,3} (?:is|are) (?:always )?(?:right|correct|"
+               r"authoritative|final)\b"),
+    # "do what it says" about text found in an image, page, file or result
+    re.compile(r"\b(?:do|follow|obey) what (?:it|that|this|they) "
+               r"(?:says?|tells? you|instructs?)\b(?! (?:in|on|at|about|here|above|"
+               r"below|there))"),
+    # text "addressed to the assistant" that is to be obeyed
+    re.compile(r"\b(?:text|instructions?|messages?|notes?|commands?)\b"
+               r"(?: \S+){0,6} (?:addressed to|meant for|directed at|aimed "
+               r"at) the (?:assistant|ai|model|agent)\b"),
+    # "the rules you were given do not really apply"
+    re.compile(r"\b(?:rules|instructions|guidelines|restrictions|policies)"
+               r"\b(?: \S+){0,2} you (?:were|have been|had been) (?:given|"
+               r"handed|told|set)\b(?: \S+){0,4} (?:do not|don't|does not|"
+               r"doesn't|no longer) (?:really |actually )?(?:apply|hold|"
+               r"matter|count|bind)\b"),
+    re.compile(r"\byour (?:\w+ )?(?:rules|instructions|guidelines|"
+               r"restrictions|policies)\b(?: \S+){0,3} (?:do not|don't|does "
+               r"not|doesn't|no longer) (?:really |actually )?(?:apply|hold|"
+               r"matter|count|bind)\b"),
+    # "the administrator ... has authorised you to share any secret"
+    re.compile(r"\b(?:administrator|admin|owner|operator|developer)\b"
+               r"(?:, who is \w+,)? has (?:already )?(?:authori[sz]ed|"
+               r"allowed|permitted) you to (?:share|reveal|disclose|send|hand|give|"
+               r"ignore|skip|bypass|disable|leak|expose)\b"),
+    # "treat its contents as commands"
+    re.compile(r"\btreat (?:its|the|that|this) (?:contents?|text|body|file|"
+               r"page|reply|answer) as (?:commands?|instructions?|orders?)"
+               r"\b"),
+    # "fetch that page and follow it"
+    re.compile(r"\b(?:fetch|download|open|load|retrieve|read|get)\b(?: \S+)"
+               r"{0,8} (?:and|then) (?:follow|obey|carry out|execute|apply)"
+               r" (?:it|them|its|whatever)\b"),
+)
+_R5_DISABLE = re.compile(
+    r"\b(?:turn|switch|shut) off\b(?: \w+){0,3} (?:content filters?|safety "
+    r"(?:filters?|checks?|features?)|guardrails?|safeguards?|confirmation "
+    r"(?:dialogs?|prompts?|steps?)|approval prompts?|permission prompts?)\b"
+    r"|\b(?:switch|put|set|turn) (?:the |this )?(?:client|agent|assistant|"
+    r"session|app)\b(?: \w+){0,2} (?:in)?to auto[- ]?(?:approve|accept|"
+    r"confirm) mode\b"
+    r"|\b(?:do not|don't|never) (?:ask|check|prompt) (?:the )?(?:user|human"
+    r"|person)? ?(?:first|beforehand)\b")
+_R5_LIE = re.compile(
+    r"\b(?:if|when) %s (?:asks?|wonders?|questions?)\b(?: \S+){0,10} "
+    r"(?:say|tell|claim|answer|reply|respond)\w*\b(?: \S+){0,3} "
+    r"(?:routine|harmless|normal|standard|nothing|maintenance|diagnostic|"
+    r"just a|a glitch|a bug)\b" % _USER_N)
+_MEMORY_OBJ = (r"(?:long[- ]term |persistent |your |the assistant's )?memory"
+               r"|future (?:chats?|conversations?|sessions?)")
+_TRUST_CLAIM = (r"(?:fully trusted|trusted|no (?:confirmation|approval|"
+                r"permission)|need no|without (?:confirmation|approval|"
+                r"asking)|every file)")
+_R5_MEMORY = (
+    re.compile(r"\b(?:store|save|record|write|add|keep|remember)\b(?: \S+)"
+               r"{0,6} (?:in|into|to) (?:your |the )?(?:long[- ]term |"
+               r"persistent )?memory\b(?: \S+){0,14} %s\b" % _TRUST_CLAIM),
+    re.compile(r"(?:^|[.!?:] )remember\b(?: \S+){0,4} (?:for|in|across) "
+               r"(?:all |every )?(?:future|later|subsequent|next|all) "
+               r"(?:chats?|conversations?|sessions?)\b"),
+)
+_TARGET = (r"(?:(?:the |this )?(?:project'?s? |repo(?:sitory)?'?s? )?)?"
+           r"(?:claude\.md|agents\.md|gemini\.md|\.cursorrules|copilot-"
+           r"instructions(?:\.md)?|\.clinerules|the project'?s? "
+           r"(?:rules|instructions) file|(?:the )?user'?s? (?:mcp |\.?mcp"
+           r"\.json |mcp server |claude |cursor |shell |agent )?(?:settings|"
+           r"config(?:uration)?)(?: file)?|(?:the )?user'?s? shell "
+           r"(?:profile|startup|rc)(?: file)?|\.bashrc|\.zshrc|\.profile|"
+           r"\.bash_profile|crontab|authorized_keys)")
+_R5_CONFIG = re.compile(
+    r"\b(?:also|first|then|next|finally|always|must|should|every (?:time|"
+    r"call)|each (?:time|call)|as (?:a|part of the) (?:setup|first|initial)"
+    r" step)\b[,:;]?(?: \S+){0,6} (?:write|append|add|edit|modify|insert|"
+    r"put|update|change)\b(?: \S+){0,14} " + _TARGET + r"\b")
+_R5_IMAGE = re.compile(
+    r"!\[[^\]]{0,60}\]\(https?://[^)]{0,300}(?:<|\{\{|\$\{)[^)]{0,200}\)")
+_R5_RELAY = re.compile(
+    r"\b(?:share|reveal|hand over|give|disclose|send)\b(?: \S+){0,3} "
+    r"(?:any|every|all) (?:secrets?|passwords?|credentials?|keys?|tokens?)"
+    r"\b(?: \S+){0,6} (?:with|to) (?:this|the) (?:tool|server)\b")
+
+
+def _round5(view: str, found: set) -> None:
+    if any(rx.search(view) for rx in _R5_HIJACK):
+        found.add("hijack")
+    if _R5_DISABLE.search(view):
+        found.add("no_consent")
+    if _R5_LIE.search(view):
+        found.add("conceal")
+    if any(rx.search(view) for rx in _R5_MEMORY) or _R5_CONFIG.search(view):
+        found.add("persist")
+    if _R5_IMAGE.search(view):
+        found.add("url_data")
+    if _R5_RELAY.search(view):
+        found.add("relay")
+
+
 def _signals(view: str, raw: str) -> set:
     """The signals one reading of a text carries."""
     found: set = set()
@@ -1160,6 +1280,7 @@ def _signals(view: str, raw: str) -> set:
         found.add("user_secrets")
     if "<!--" in view:
         found.add("comment")
+    _round5(view, found)
     return found
 
 
@@ -1191,6 +1312,8 @@ _LABELS = {
     "private_out": "tells the agent to put private data it holds (the "
                    "conversation, keys, cookies) into an argument or send it "
                    "out",
+    "persist": "tells the agent to change its own memory or rules, or the "
+               "user's settings or shell startup",
     "comment": "contains an HTML comment (not shown when rendered)",
     "encoded": "contains encoded text",
     "blob": "contains a long base64-looking string",
@@ -1198,7 +1321,8 @@ _LABELS = {
 _ORDER = ("override", "conceal", "read_sensitive", "contents", "sensitive",
           "read_weak", "carry_param", "send_data", "url_data", "run_remote",
           "prompt_leak", "tag", "hijack", "no_consent", "relay",
-          "user_secrets", "private_out", "hidden", "comment", "encoded",
+          "user_secrets", "private_out", "persist", "hidden", "comment",
+          "encoded",
           "blob", "truncated")
 #: A signal whose label already says what these say.
 _INCLUDES = {"read_sensitive": {"contents", "sensitive", "read_weak"},
@@ -1248,8 +1372,11 @@ def _severity(s: set):
         return "critical"
     if "private_out" in s and s & {"conceal", "tag", "hijack", "obligation"}:
         return "critical"
+    if "persist" in s and (carry or s & {"no_consent", "relay", "user_secrets",
+                                         "tag", "hijack"}):
+        return "critical"
     if s & {"conceal", "hidden", "url_data", "read_sensitive", "prompt_leak",
-            "no_consent", "relay", "private_out"}:
+            "no_consent", "relay", "private_out", "persist"}:
         return "high"
     if "read_weak" in s and carry:
         return "high"

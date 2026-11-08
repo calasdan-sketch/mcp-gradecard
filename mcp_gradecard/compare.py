@@ -72,6 +72,14 @@ def load(path: str) -> dict:
                               "title": ""})
         return {"version": _s(data.get("version"), 40), "deep": None,
                 "overall": None, "servers": servers, "findings": items}
+    if (tool is None and "schema_version" not in data and "schema" not in data
+            and isinstance(data.get("results"), list)
+            and all(isinstance(r, dict) and "findings" in r
+                    for r in data["results"][:50])):
+        raise CompareError("--compare file looks like a report from "
+                           "mcp-gradecard 0.3.0 or earlier, which did not "
+                           "number its findings: it cannot be compared; run "
+                           "the earlier check again with this version")
     if not (isinstance(tool, dict) and tool.get("name") == "mcp-gradecard"
             and data.get("schema_version") == 1
             and isinstance(data.get("results"), list)):

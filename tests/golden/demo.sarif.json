@@ -1,0 +1,440 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "mcp-gradecard",
+          "version": "VERSION",
+          "organization": "Calas Automations Inc.",
+          "informationUri": "https://github.com/calasdan-sketch/mcp-gradecard",
+          "rules": [
+            {
+              "id": "floating-version",
+              "name": "floating-version",
+              "shortDescription": {
+                "text": "Package version not pinned"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "mcp",
+                  "OWASP-MCP04"
+                ],
+                "security-severity": "5.5"
+              },
+              "fullDescription": {
+                "text": "Package version not pinned"
+              },
+              "help": {
+                "text": "Pin an exact version (pkg@1.2.3 / pkg==1.2.3) so a compromised release cannot reach you on the next launch. (OWASP MCP Top 10: MCP04 Software Supply Chain Attacks & Dependency Tampering)"
+              },
+              "helpUri": "https://owasp.org/www-project-mcp-top-10/"
+            },
+            {
+              "id": "secret-env",
+              "name": "secret-env",
+              "shortDescription": {
+                "text": "Secrets handed to the server"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "mcp",
+                  "OWASP-MCP01",
+                  "OWASP-MCP02"
+                ],
+                "security-severity": "5.5"
+              },
+              "fullDescription": {
+                "text": "Secrets handed to the server"
+              },
+              "help": {
+                "text": "Give the server a token with the narrowest scope and shortest life that works, and only to servers you trust. (OWASP MCP Top 10: MCP01 Token Mismanagement & Secret Exposure; MCP02 Privilege Escalation via Scope Creep)"
+              },
+              "helpUri": "https://owasp.org/www-project-mcp-top-10/"
+            },
+            {
+              "id": "plaintext-secret",
+              "name": "plaintext-secret",
+              "shortDescription": {
+                "text": "Credential stored in plain text in the config"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "mcp",
+                  "OWASP-MCP01"
+                ],
+                "security-severity": "3.0"
+              },
+              "fullDescription": {
+                "text": "Credential stored in plain text in the config"
+              },
+              "help": {
+                "text": "Move the value to your OS keychain or shell environment and reference it (\"${TOKEN}\" where the client supports it). In a project file: rotate it and make sure the file is not committed. (OWASP MCP Top 10: MCP01 Token Mismanagement & Secret Exposure)"
+              },
+              "helpUri": "https://owasp.org/www-project-mcp-top-10/"
+            },
+            {
+              "id": "remote-server",
+              "name": "remote-server",
+              "shortDescription": {
+                "text": "Remote MCP server (traffic leaves the machine)"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "mcp",
+                  "OWASP-MCP10"
+                ],
+                "security-severity": "5.5"
+              },
+              "fullDescription": {
+                "text": "Remote MCP server (traffic leaves the machine)"
+              },
+              "help": {
+                "text": "Check you trust the operator with everything your agent will send. Trust a host of your own with `--allow-host`. (OWASP MCP Top 10: MCP10 Context Injection & Over-Sharing)"
+              },
+              "helpUri": "https://owasp.org/www-project-mcp-top-10/"
+            },
+            {
+              "id": "insecure-transport",
+              "name": "insecure-transport",
+              "shortDescription": {
+                "text": "Remote MCP server reached without TLS"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "mcp",
+                  "OWASP-MCP07",
+                  "OWASP-MCP03"
+                ],
+                "security-severity": "8.0"
+              },
+              "fullDescription": {
+                "text": "Remote MCP server reached without TLS"
+              },
+              "help": {
+                "text": "Use the server's https:// (or wss://) URL. Over plain http anyone on the network can read tokens and rewrite tool descriptions. (OWASP MCP Top 10: MCP07 Insufficient Authentication & Authorization; MCP03 Tool Poisoning)"
+              },
+              "helpUri": "https://owasp.org/www-project-mcp-top-10/"
+            },
+            {
+              "id": "credential-in-url",
+              "name": "credential-in-url",
+              "shortDescription": {
+                "text": "Credential written into a server URL"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "mcp",
+                  "OWASP-MCP01",
+                  "OWASP-MCP07"
+                ],
+                "security-severity": "8.0"
+              },
+              "fullDescription": {
+                "text": "Credential written into a server URL"
+              },
+              "help": {
+                "text": "Rotate the credential, remove it from the URL and send it in an Authorization header that references an environment variable (\"Bearer ${TOKEN}\"), or use the server's OAuth sign-in. (OWASP MCP Top 10: MCP01 Token Mismanagement & Secret Exposure; MCP07 Insufficient Authentication & Authorization)"
+              },
+              "helpUri": "https://owasp.org/www-project-mcp-top-10/"
+            },
+            {
+              "id": "suspicious-command",
+              "name": "suspicious-command",
+              "shortDescription": {
+                "text": "Launch command downloads or runs code through a shell"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "mcp",
+                  "OWASP-MCP05",
+                  "OWASP-MCP04"
+                ],
+                "security-severity": "9.5"
+              },
+              "fullDescription": {
+                "text": "Launch command downloads or runs code through a shell"
+              },
+              "help": {
+                "text": "Replace the entry with a pinned package (npx pkg@1.2.3, uvx pkg==1.2.3) or a local binary you have reviewed. `--fix --remove` can delete it. (OWASP MCP Top 10: MCP05 Command Injection & Execution; MCP04 Software Supply Chain Attacks & Dependency Tampering)"
+              },
+              "helpUri": "https://owasp.org/www-project-mcp-top-10/"
+            },
+            {
+              "id": "pipe-to-shell",
+              "name": "pipe-to-shell",
+              "shortDescription": {
+                "text": "Downloaded script piped straight into a shell"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "mcp",
+                  "OWASP-MCP05",
+                  "OWASP-MCP04"
+                ],
+                "security-severity": "9.5"
+              },
+              "fullDescription": {
+                "text": "Downloaded script piped straight into a shell"
+              },
+              "help": {
+                "text": "Never run `curl ... | sh` from an MCP config: download, review and pin the script, or install the server from a package registry. `--fix --remove` can delete it. (OWASP MCP Top 10: MCP05 Command Injection & Execution; MCP04 Software Supply Chain Attacks & Dependency Tampering)"
+              },
+              "helpUri": "https://owasp.org/www-project-mcp-top-10/"
+            },
+            {
+              "id": "exfiltration-endpoint",
+              "name": "exfiltration-endpoint",
+              "shortDescription": {
+                "text": "Remote endpoint baked into the launch"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "mcp",
+                  "OWASP-MCP10",
+                  "OWASP-MCP04"
+                ],
+                "security-severity": "9.5"
+              },
+              "fullDescription": {
+                "text": "Remote endpoint baked into the launch"
+              },
+              "help": {
+                "text": "Confirm the host is one you expect this server to talk to. If it is yours, trust it with `--allow-host`; if not, remove the server. (OWASP MCP Top 10: MCP10 Context Injection & Over-Sharing; MCP04 Software Supply Chain Attacks & Dependency Tampering)"
+              },
+              "helpUri": "https://owasp.org/www-project-mcp-top-10/"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "floating-version",
+          "level": "warning",
+          "message": {
+            "text": "github: unpinned package '@modelcontextprotocol/server-github' \u2014 every launch can pull a different (possibly compromised) release; pin with @modelcontextprotocol/server-github@x.y.z"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "urn:mcp-gradecard:demo"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "mcpGradecard/v1": "cf48438aa4c756850c705c01c502ab4a1714c5194eda87ae1b7db2d3da1399a5"
+          },
+          "properties": {
+            "severity": "medium",
+            "server": "github",
+            "client": "demo"
+          }
+        },
+        {
+          "ruleId": "secret-env",
+          "level": "warning",
+          "message": {
+            "text": "github: server receives secrets via env: GITHUB_PERSONAL_ACCESS_TOKEN \u2014 a compromised server leaks these"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "urn:mcp-gradecard:demo"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "mcpGradecard/v1": "cde71d9bf6526c129399d5b7fe3461b294cfba59741affb917bd2bdec5418d76"
+          },
+          "properties": {
+            "severity": "medium",
+            "server": "github",
+            "client": "demo"
+          }
+        },
+        {
+          "ruleId": "plaintext-secret",
+          "level": "note",
+          "message": {
+            "text": "github: credential stored in plain text in the config file: env GITHUB_PERSONAL_ACCESS_TOKEN \u2014 anything that can read this file has it; keep it in your OS keychain or shell environment and reference it"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "urn:mcp-gradecard:demo"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "mcpGradecard/v1": "ddb8448301c8198ea0c3cba110417bc5ecb826b41b4c287cf22e6c3fb1a309bf"
+          },
+          "properties": {
+            "severity": "low",
+            "server": "github",
+            "client": "demo"
+          }
+        },
+        {
+          "ruleId": "remote-server",
+          "level": "warning",
+          "message": {
+            "text": "vendor-crm: remote MCP server URL (traffic leaves the machine): http://mcp.crm-vendor.example/..."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "urn:mcp-gradecard:demo"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "mcpGradecard/v1": "24531d2c8894a57412fadfe8b26095266cf121bc48898473e842448da3d0cde5"
+          },
+          "properties": {
+            "severity": "medium",
+            "server": "vendor-crm",
+            "client": "demo"
+          }
+        },
+        {
+          "ruleId": "insecure-transport",
+          "level": "error",
+          "message": {
+            "text": "vendor-crm: remote MCP server in 'url' is reached over plain http:// (no TLS): anyone on the network path can read its traffic, including any token, and rewrite the tool descriptions your agent reads; use https://"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "urn:mcp-gradecard:demo"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "mcpGradecard/v1": "8807bcc96d16247080d8e3915f1b7ca261ab491e5da522a66d3b71a8d6a6678d"
+          },
+          "properties": {
+            "severity": "high",
+            "server": "vendor-crm",
+            "client": "demo"
+          }
+        },
+        {
+          "ruleId": "credential-in-url",
+          "level": "error",
+          "message": {
+            "text": "vendor-crm: credential written into a URL in 'url' (api_key): URLs are kept in logs, proxies and shell history; keeping credentials out of URLs is standard practice. Send it in an Authorization header that references an environment variable"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "urn:mcp-gradecard:demo"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "mcpGradecard/v1": "52ea6cec23136e42d648d22858fdd17e1ff8c34727a82e9cb03c8142b5c57e8e"
+          },
+          "properties": {
+            "severity": "high",
+            "server": "vendor-crm",
+            "client": "demo"
+          }
+        },
+        {
+          "ruleId": "suspicious-command",
+          "level": "error",
+          "message": {
+            "text": "quick-setup: server runs 'curl' inside 'bash' \u2014 a downloader/shell, not a server binary"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "urn:mcp-gradecard:demo"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "mcpGradecard/v1": "a699b8e07703f249a0ea6902bcfb00a8a3ba7efda92cf856f66ebe215d7623d0"
+          },
+          "properties": {
+            "severity": "critical",
+            "server": "quick-setup",
+            "client": "demo"
+          }
+        },
+        {
+          "ruleId": "pipe-to-shell",
+          "level": "error",
+          "message": {
+            "text": "quick-setup: command pipes content into a shell (classic curl|sh pattern)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "urn:mcp-gradecard:demo"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "mcpGradecard/v1": "2f991155bb183149b747325e023e8742baf2c9faa91369fdc945833b4c68a93d"
+          },
+          "properties": {
+            "severity": "critical",
+            "server": "quick-setup",
+            "client": "demo"
+          }
+        },
+        {
+          "ruleId": "exfiltration-endpoint",
+          "level": "error",
+          "message": {
+            "text": "quick-setup: remote endpoint in args: https://get.tools.example/..."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "urn:mcp-gradecard:demo"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "mcpGradecard/v1": "6fe9466bc62bd6014e04360153282fce0a0a0a9ca6d875e04cf4db43264b4c57"
+          },
+          "properties": {
+            "severity": "critical",
+            "server": "quick-setup",
+            "client": "demo"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
 <meta name="referrer" content="no-referrer">
-<title>MCP Safety Check: demo workstation</title><style>
+<title>MCP Safety Check: Demo Workstation (sample data)</title><style>
 :root{--bg:#f7f7f5;--card:#fff;--ink:#1c1d1f;--muted:#5d6168;--line:#e3e3df;
 --crit:#b3261e;--high:#c2410c;--med:#a16207;--low:#4b5563;--ok:#15803d;
 --chip:#efefeb;--a:#15803d;--b:#4d7c0f;--c:#a16207;--d:#c2410c;--f:#b3261e}
@@ -60,8 +60,8 @@ a{color:inherit}
 @media print{body{background:#fff}.card{break-inside:avoid}main{padding:0}}
 @media (max-width:640px){th.hide,td.hide{display:none}}
 </style></head><body><main>
-<h1>MCP Safety Check: demo workstation</h1>
-<div class="meta">Generated 2026-11-07 09:47 UTC by mcp-gradecard 0.5.0 &middot; 1 config file(s) &middot; 4 server(s) &middot; static audit &middot; prepared by Calas Automations &middot; report id 21e7340d37e3</div>
+<h1>MCP Safety Check: Demo Workstation (sample data)</h1>
+<div class="meta">Generated 2026-11-08 00:27 UTC by mcp-gradecard 0.5.0 &middot; 1 config file(s) &middot; 4 server(s) &middot; static audit &middot; prepared by Calas Automations Inc. &middot; report id 21e7340d37e3</div>
 <section class="card hero">
 <div class="grade g-F" aria-label="grade F">F</div>
 <div>
@@ -73,6 +73,17 @@ a{color:inherit}
 <span class="pill"><span class="sev s-medium">medium</span> 3</span>
 <span class="pill"><span class="sev s-low">low</span> 1</span>
 </div></div></section>
+<h2>Scope and method</h2><section class="card"><table>
+<tr><th>Prepared for</th><td class="msg">Demo Workstation (sample data)</td></tr>
+<tr><th>Prepared by</th><td class="msg">Calas Automations Inc.</td></tr>
+<tr><th>Date and tool</th><td class="msg">2026-11-08 00:27 UTC; mcp-gradecard 0.5.0</td></tr>
+<tr><th>What was examined</th><td class="msg">1 configuration file(s) (explicit) holding 4 MCP server(s). Only the settings written in those files were read.</td></tr>
+<tr><th>Live tool scan</th><td class="msg">Not done. No server was launched and no tool description was read, so poisoned tool text is not covered by this report.</td></tr>
+<tr><th>Package lookups</th><td class="msg">mcp-gradecard sent nothing anywhere. The advisory feed in this version lists 6 known issue(s); a package with no published advisory reads as clean.</td></tr>
+<tr><th>Engagement scope</th><td class="msg">Sample only: a made-up config, not a real engagement. A real scope statement names the machines, the clients and what was and was not launched.</td></tr>
+<tr><th>Review by a person</th><td class="msg">Not recorded. Findings come from automatic rules; a match is a lead for a person to confirm, not a verdict.</td></tr>
+<tr><th>Grades</th><td class="msg">A server starts at 100 and loses 40 per critical, 20 per high, 10 per medium and 5 per low finding (A 90+, B 75+, C 60+, D 40+, F below); any critical caps it at D. The overall grade is the lowest. Grades are comparable only between runs of the same mcp-gradecard version: newer versions add checks.</td></tr>
+</table><p class="meta">Severity: critical = the server runs a downloader, pipes content into a shell or is started with encoded code, or a tool description tries to take control of the agent; fix before using it; high = a serious weakness, such as a credential in a URL, a plain-http remote server or a code-injecting launch setting; fix soon; medium = weakens the setup or makes an attack easier, such as an unpinned package; plan a fix; low = hygiene; worth tidying.</p></section>
 <h2>Fix these first</h2><section class="card"><table>
 <tr><th>Severity</th><th>Server</th><th>Finding</th></tr>
 <tr><td><span class="sev s-critical">critical</span></td><td class="nm">quick-setup</td><td class="msg"><strong>Launch command downloads or runs code through a shell</strong><br>server runs &#x27;curl&#x27; inside &#x27;bash&#x27; — a downloader/shell, not a server binary</td></tr>

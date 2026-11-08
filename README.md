@@ -899,42 +899,44 @@ there.
 
 ## Benchmark: how well does the description scan work?
 
-`bench/` holds 356 invented MCP tool definitions (197 malicious across 13
-attack classes, 159 benign including look-alikes such as a security tool that
+`bench/` holds 397 invented MCP tool definitions (224 malicious across 19
+attack classes, 173 benign including look-alikes such as a security tool that
 quotes an attack), the script that builds them (`make_corpus.py`) and the one
 that measures the scan (`run.py`). Nothing in it is a working exploit; hosts
 are reserved example names. Re-run it with `python bench/run.py` (add `--write`
 to refresh `bench/results.json`; a test fails if the committed file is stale).
 
-The corpus is in four parts, written at different times, and only the part
+The corpus is in five parts, written at different times, and only the part
 that was never used to change the scanner says anything about attacks the
 author has not seen:
 
 | Part | Written | malicious | benign | recall | precision | false-positive rate |
 |---|---|---|---|---|---|---|
 | dev | first; the scanner was tuned on it | 84 | 85 | 0.940 | 0.975 | 0.024 |
-| holdout | after that, in fresh wording | 37 | 28 | 0.784 | 0.967 | 0.036 |
+| holdout | after that, in fresh wording | 37 | 28 | 0.811 | 0.968 | 0.036 |
 | r3 | round 3, red-team wording | 47 | 31 | **0.489 before tuning**, 1.000 after | 1.000 | 0.000 |
 | r3b | round 3, after the r3 changes | 29 | 15 | **0.414 before tuning**, 1.000 after | 0.923 before, 0.967 after | 0.067 |
-| all four, 0.5.0 final | | 197 | 159 | 0.934 | 0.979 | 0.025 |
+| r5 | round 5: results, memory, rules files, images, other tools | 27 | 14 | **0.370 before tuning**, 1.000 after | 1.000 | 0.000 |
+| all five, 0.5.0 final | | 224 | 173 | 0.946 | 0.981 | 0.023 |
 
 ("Recall" is the share of malicious tools with at least one finding of any
 severity. The "before tuning" figures are each part's first measurement,
-kept in `bench/r3_before.json` and `bench/r3b_before.json`; the "after" figures
+kept in `bench/r3_before.json`, `bench/r3b_before.json` and
+`bench/r5_before.json`; the "after" figures
 were reached by adding patterns for what was missed, so they show that the
 patterns work on those texts, not that new attacks will be caught.)
 
 Read the "before tuning" rows. A new set of attacks written by the same
 author in fresh wording is caught less than half the time on first contact
-(0.49 and 0.41), where the earlier 0.73 holdout figure suggested more. The
+(0.49, 0.41 and 0.37), where the earlier 0.73 holdout figure suggested more. The
 scan is a pattern reader: paraphrase, euphemism, a role-play frame and a
 persona ("let's play a game") are its weakest classes, and a security tool
-that quotes an attack is flagged (4 of 159 benign here). It finds the
+that quotes an attack is flagged (4 of 173 benign here). It finds the
 common moves and a lead for a person to read; it does not prove a server is
-clean. At "high or higher" the whole-corpus recall is 0.736. Rug-pull (pinned
+clean. At "high or higher" the whole-corpus recall is 0.714. Rug-pull (pinned
 definition changed) and tool-shadowing are checked by hash and by name, 11 of
 11 and 12 of 12, with no false alarm on re-listed tools. No false-alarm rate
-on real-world descriptions was measured beyond the 159 invented benign ones
+on real-world descriptions was measured beyond the 173 invented benign ones
 and a hand-written list of ordinary descriptions in the tests.
 
 The same tool definitions through Cisco's offline YARA analyzer
@@ -960,7 +962,14 @@ MCP Top 10](https://owasp.org/www-project-mcp-top-10/) risks they are
 evidence of, and end with what the audit does not cover. Every name, path and
 message from a config or a server is sanitized and escaped, so a hostile
 server name cannot inject markup. `--report-title` sets the heading and
-`--prepared-by` names who prepared it. They also carry a report id (the same
+`--prepared-by` names who prepared it; `--client` names who it is for (and
+titles it "MCP Safety Check: <client>"), `--scope-note` states what was
+agreed to be in scope, and `--reviewed-by` records the person who read every
+critical and high finding (leave it out unless that is true: without it the
+report says no review is recorded). A "Scope and method" section near the top
+says what was examined, whether any server was launched, whether anything was
+looked up online, how many known issues the built-in feed holds, how the
+grades are worked out and what each severity means. They also carry a report id (the same
 findings give the same id), an inventory of what each server runs or connects to
 (packages with their pin state, remote hosts; never arguments), the accepted
 (suppressed) findings with reasons and dates, and a plain statement of what the
@@ -978,8 +987,9 @@ If it is missing or malformed mcp-gradecard exits 2 and says so, instead of
 quietly reporting every known-vulnerable package as clean. The test-suite
 builds the wheel, unpacks it elsewhere and runs the installed copy.
 
-`mcp_gradecard/advisories.json` carries three entries, each checked on 2026-10-18
-against the public record it cites (the `source` field says which):
+`mcp_gradecard/advisories.json` carries six entries. The first three were
+checked on 2026-10-18 and the last three on 2026-11-08 against the public
+record each cites (the `source` field says which):
 
 - `mcp-server-fetch`: CVE-2026-104120, a server-side request forgery in
   `fetch_url`. The record lists versions up to 2026.6.4 and comes from the
@@ -992,6 +1002,20 @@ against the public record it cites (the `source` field says which):
   HashiCorp bulletin HCSEC-2026-23.
 - `consul-mcp-server` (before 0.1.4): CVE-2026-16326 and CVE-2026-16328,
   HashiCorp bulletin HCSEC-2026-24.
+
+- `@modelcontextprotocol/inspector` (before 0.14.1): CVE-2025-49596, no
+  authentication between the Inspector and its proxy (NVD record, CVSS 9.4).
+- `@modelcontextprotocol/server-filesystem` (before 0.6.4, or before 2025.7.1
+  on the date-numbered line): CVE-2025-53109 and CVE-2025-53110, files outside
+  the allowed folders reachable. The entry carries both fixed versions
+  (`fixed_lines`), so 0.6.4 and 2025.8.21 read as patched and 2025.3.28 does not.
+- `mcp-server-git` (before 2025.12.18): CVE-2025-68143, CVE-2025-68144 and
+  CVE-2025-68145. The three records name three fixed versions; the latest
+  clears all of them.
+
+`mcp-remote` (CVE-2025-6514) is not listed: the NVD record names no fixed
+version and the vendor write-up could not be read in this session, so it
+waits for a source that does.
 
 The HashiCorp flaws are in the streamable-HTTP transport (one user's
 credentials serving other users); the bulletins do not describe a local stdio
@@ -1041,7 +1065,7 @@ What mcp-gradecard does not do, so that you do not find out the hard way:
 **New in 0.5.0**
 
 - The description scan is a pattern reader. On new sets of attacks written
-  by its author in fresh wording it caught 0.49 and 0.41 on first contact
+  by its author in fresh wording it caught 0.49, 0.41 and 0.37 on first contact
   (see the benchmark); every pattern added afterwards fits the texts it was
   added for. Paraphrase, euphemism and role-play get through, and a tool that
   quotes an attack can be flagged.

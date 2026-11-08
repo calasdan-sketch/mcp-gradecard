@@ -1,6 +1,6 @@
 name: "MCP safety check"
 description: "Grade the MCP servers configured in a repository (A to F), upload SARIF to code scanning, and fail the job on new findings. Offline: nothing is sent anywhere."
-author: "Calas Automations"
+author: "Calas Automations Inc."
 branding:
   icon: shield
   color: blue

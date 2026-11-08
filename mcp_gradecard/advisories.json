@@ -28,5 +28,39 @@
     "title": "consul-mcp-server before 0.1.4 (from 0.1.0): one client's Consul token can be used for other clients in streamable-HTTP stateless mode (CVSS 3.1 10.0), and a client can redirect Consul API traffic, token included (SSRF)",
     "verified": true,
     "note": "The bulletin lists the first flaw for stateless mode only (stateful mode is not affected) and the second for deployments whose clients are not fully trusted. The records do not describe stdio use as affected. Upgrade anyway."
+  },
+  {
+    "cve": "CVE-2025-49596",
+    "fixed_in": "0.14.1",
+    "package": "@modelcontextprotocol/inspector",
+    "severity": "critical",
+    "source": "NVD record CVE-2025-49596 (published 2025-06-13; CVSS 3.1 9.4) and the project advisory GHSA-7f8r-222p-6f5g, both named in the record; read 2026-11-08",
+    "title": "MCP Inspector before 0.14.1: no authentication between the Inspector client and its proxy, so unauthenticated requests can launch MCP commands over stdio (remote code execution)",
+    "verified": true,
+    "note": "A developer tool, normally run by hand on a laptop. Upgrade to 0.14.1 or later."
+  },
+  {
+    "cve": "CVE-2025-53109, CVE-2025-53110",
+    "fixed_in": "0.6.4 / 2025.7.1",
+    "fixed_lines": [
+      "0.6.4",
+      "2025.7.1"
+    ],
+    "package": "@modelcontextprotocol/server-filesystem",
+    "severity": "high",
+    "source": "NVD records CVE-2025-53109 and CVE-2025-53110 (published 2025-07-02; CVSS 3.1 7.3 each) and the advisories GHSA-q66q-fx2p-7w4m and GHSA-hc55-p739-j48w, named in the records; read 2026-11-08",
+    "title": "Filesystem MCP server before 0.6.4 (older numbering) or 2025.7.1 (date numbering): files outside the allowed directories can be reached through symlinks, or through a path that only starts with an allowed directory's name",
+    "verified": true,
+    "note": "The records write the second fixed version as 2025.7.01; it is read here as 2025.7.1. Upgrade anyway."
+  },
+  {
+    "cve": "CVE-2025-68143, CVE-2025-68144, CVE-2025-68145",
+    "fixed_in": "2025.12.18",
+    "package": "mcp-server-git",
+    "severity": "high",
+    "source": "NVD records CVE-2025-68143, CVE-2025-68144 and CVE-2025-68145 (published 2025-12-17; CVSS 3.1 8.8, 7.1 and 9.1) and the advisories GHSA-5cgr-j3jf-jw3v, GHSA-9xwc-hfwc-8w59 and GHSA-j22h-9j4x-23w5, named in the records; read 2026-11-08",
+    "title": "mcp-server-git before 2025.12.18: git_init accepts any path (before 2025.9.25); git_diff and git_checkout pass flag-like values to git, which can overwrite files (before 2025.12.17); --repository does not restrict repo_path (before 2025.12.18)",
+    "verified": true,
+    "note": "The three records name three different fixed versions; the latest, 2025.12.18, clears all of them. Upgrade to it or later."
   }
 ]

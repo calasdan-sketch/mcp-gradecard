@@ -1,6 +1,6 @@
-# MCP Safety Check: demo workstation
+# MCP Safety Check: Demo Workstation (sample data)
 
-Generated 2026-11-07 09:47 UTC by mcp-gradecard 0.5.0 · 1 config file(s) · 4 server(s) · static audit · prepared by Calas Automations · report id 21e7340d37e3
+Generated 2026-11-08 00:27 UTC by mcp-gradecard 0.5.0 · 1 config file(s) · 4 server(s) · static audit · prepared by Calas Automations Inc. · report id 21e7340d37e3
 
 **Overall grade: F** (the lowest grade of any server)
 
@@ -9,6 +9,20 @@ Generated 2026-11-07 09:47 UTC by mcp-gradecard 0.5.0 · 1 config file(s) · 4 s
 | Critical | High | Medium | Low |
 |---|---|---|---|
 | 3 | 2 | 3 | 1 |
+
+## Scope and method
+
+- **Prepared for:** Demo Workstation (sample data)
+- **Prepared by:** Calas Automations Inc.
+- **Date and tool:** 2026-11-08 00:27 UTC; mcp-gradecard 0.5.0
+- **What was examined:** 1 configuration file(s) (explicit) holding 4 MCP server(s). Only the settings written in those files were read.
+- **Live tool scan:** Not done. No server was launched and no tool description was read, so poisoned tool text is not covered by this report.
+- **Package lookups:** mcp-gradecard sent nothing anywhere. The advisory feed in this version lists 6 known issue(s); a package with no published advisory reads as clean.
+- **Engagement scope:** Sample only: a made-up config, not a real engagement. A real scope statement names the machines, the clients and what was and was not launched.
+- **Review by a person:** Not recorded. Findings come from automatic rules; a match is a lead for a person to confirm, not a verdict.
+- **Grades:** A server starts at 100 and loses 40 per critical, 20 per high, 10 per medium and 5 per low finding (A 90+, B 75+, C 60+, D 40+, F below); any critical caps it at D. The overall grade is the lowest. Grades are comparable only between runs of the same mcp-gradecard version: newer versions add checks.
+
+Severity: critical = the server runs a downloader, pipes content into a shell or is started with encoded code, or a tool description tries to take control of the agent; fix before using it; high = a serious weakness, such as a credential in a URL, a plain-http remote server or a code-injecting launch setting; fix soon; medium = weakens the setup or makes an attack easier, such as an unpinned package; plan a fix; low = hygiene; worth tidying.
 
 ## Fix these first
 
